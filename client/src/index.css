@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-ink-50 text-ink-800 font-sans antialiased;
+  }
+  h1, h2, h3 {
+    @apply font-display tracking-tight;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-white rounded-md;
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold
+           transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-primary {
+    @apply btn bg-brand-700 text-white hover:bg-brand-800 shadow-sm hover:shadow-lift;
+  }
+  .btn-secondary {
+    @apply btn bg-white text-ink-800 ring-1 ring-inset ring-ink-100 hover:bg-ink-50;
+  }
+  .btn-ghost {
+    @apply btn text-ink-600 hover:bg-ink-100;
+  }
+  .btn-accent {
+    @apply btn bg-sand-500 text-white hover:bg-sand-600;
+  }
+
+  .card {
+    @apply rounded-2xl bg-white shadow-card ring-1 ring-ink-100/70;
+  }
+
+  .input {
+    @apply w-full rounded-xl border-0 bg-white px-4 py-2.5 text-sm text-ink-800 shadow-sm
+           ring-1 ring-inset ring-ink-100 placeholder:text-ink-400
+           focus:ring-2 focus:ring-inset focus:ring-brand-500;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink-600;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .badge-brand {
+    @apply badge bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-100;
+  }
+  .badge-sand {
+    @apply badge bg-sand-50 text-sand-700 ring-1 ring-inset ring-sand-100;
+  }
+  .badge-muted {
+    @apply badge bg-ink-100 text-ink-600;
+  }
+
+  .link {
+    @apply text-brand-700 underline-offset-2 hover:underline;
+  }
+
+  .prose-unigo {
+    @apply text-[15px] leading-relaxed text-ink-600;
+  }
+}
+
+/* Accessibilité : respect de la préférence « animations réduites » */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    transition-duration: .001ms !important;
+  }
+}

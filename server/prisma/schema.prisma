@@ -1,0 +1,346 @@
+// ---------------------------------------------------------------
+// UNIGO - Schema de base de donnees
+// Base : MySQL (XAMPP). Pour passer a PostgreSQL, remplacez
+// provider = "mysql" par provider = "postgresql" ci-dessous.
+// ---------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================= UTILISATEURS =============================
+
+enum Role {
+  VISITOR
+  STUDENT
+  PARTNER
+  ADMIN
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  fullName      String
+  email         String   @unique
+  passwordHash  String
+  role          Role     @default(STUDENT)
+  countryOrigin String?
+  targetCity    String?
+  studyField    String?
+  interests     String?  @db.Text
+  avatarUrl     String?
+  locale        String   @default("fr")
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  reviews       Review[]
+  favorites     Favorite[]
+  testimonials  Testimonial[]
+  resetTokens   PasswordResetToken[]
+
+  @@index([email])
+}
+
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  tokenHash String   @unique
+  userId    Int
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Journalise les tentatives de connexion (limitation des essais abusifs)
+model LoginAttempt {
+  id        Int      @id @default(autoincrement())
+  email     String
+  ip        String?
+  success   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+}
+
+// ============================= MODULE UNIVERSITE (Kaiju) =============================
+
+enum UniversityType {
+  PUBLIQUE
+  PRIVEE
+}
+
+model University {
+  id             Int            @id @default(autoincrement())
+  slug           String         @unique
+  name           String
+  acronym        String?
+  type           UniversityType @default(PUBLIQUE)
+  city           String
+  region         String?
+  address        String?
+  description    String         @db.Text
+  descriptionEn  String?        @db.Text
+  website        String?
+  email          String?
+  phone          String?
+  logoUrl        String?
+  coverUrl       String?
+  latitude       Float?
+  longitude      Float?
+  foundedYear    Int?
+  studentCount   Int?
+  languages      String         @default("Francais")
+  admissionInfo  String?        @db.Text
+  scholarships   String?        @db.Text
+  hasCampusHousing Boolean      @default(false)
+  acceptsForeign Boolean        @default(true)
+  isPublished    Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  programs       Program[]
+  reviews        Review[]
+  favorites      Favorite[]
+  testimonials   Testimonial[]
+
+  @@index([city])
+  @@index([type])
+}
+
+enum Degree {
+  LICENCE
+  MASTER
+  DOCTORAT
+  BTS
+  DUT
+  AUTRE
+}
+
+model Program {
+  id            Int        @id @default(autoincrement())
+  name          String
+  field         String // Domaine : Informatique, Sante, Droit, Gestion...
+  degree        Degree     @default(LICENCE)
+  durationYears Int        @default(3)
+  tuitionFcfa   Int        @default(0) // frais annuels indicatifs en FCFA
+  language      String     @default("Francais")
+  description   String?    @db.Text
+  admissionReq  String?    @db.Text
+  universityId  Int
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  university    University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  @@index([universityId])
+  @@index([field])
+  @@index([degree])
+}
+
+model Review {
+  id           Int        @id @default(autoincrement())
+  rating       Int // 1 a 5
+  title        String?
+  comment      String     @db.Text
+  isApproved   Boolean    @default(false)
+  userId       Int
+  universityId Int
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  university   University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, universityId])
+  @@index([universityId])
+}
+
+model Testimonial {
+  id           Int         @id @default(autoincrement())
+  authorName   String
+  country      String
+  year         Int?
+  content      String      @db.Text
+  isApproved   Boolean     @default(false)
+  userId       Int?
+  universityId Int?
+  createdAt    DateTime    @default(now())
+
+  user         User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  university   University? @relation(fields: [universityId], references: [id], onDelete: SetNull)
+}
+
+// Guide des demarches administratives (visa, titre de sejour, equivalences...)
+model Procedure {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique
+  title       String
+  titleEn     String?
+  category    String // Visa, Sejour, Equivalence, Inscription, Sante, Banque
+  summary     String   @db.Text
+  content     String   @db.Text
+  contentEn   String?  @db.Text
+  documents   String?  @db.Text // liste des pieces, une par ligne
+  estimatedCostFcfa Int?
+  estimatedDelay    String?
+  officialLink      String?
+  orderIndex  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+}
+
+// ============================= FAVORIS (transverse) =============================
+
+enum FavoriteType {
+  UNIVERSITY
+  ROUTE
+  EVENT
+}
+
+model Favorite {
+  id           Int          @id @default(autoincrement())
+  type         FavoriteType @default(UNIVERSITY)
+  userId       Int
+  universityId Int?
+  routeId      Int?
+  eventId      Int?
+  createdAt    DateTime     @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  university   University?  @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, universityId, routeId, eventId])
+  @@index([userId])
+}
+
+// ============================= MODULE TRANSPORT (Binta) =============================
+// Modeles de base fournis comme point de depart : a completer sur la branche
+// feature/transport-binta (tarifs detailles, horaires, prestataires, carte).
+
+enum TransportMode {
+  BUS
+  BRT
+  TER
+  CAR_RAPIDE
+  TAXI
+  VTC
+  INTERURBAIN
+}
+
+model TransportOption {
+  id           Int           @id @default(autoincrement())
+  slug         String        @unique
+  name         String
+  mode         TransportMode
+  description  String        @db.Text
+  coverageArea String?
+  priceMinFcfa Int?
+  priceMaxFcfa Int?
+  schedule     String?       @db.Text
+  safetyTips   String?       @db.Text
+  operator     String?
+  website      String?
+  logoUrl      String?
+  isPublished  Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  routes       Route[]
+}
+
+model Route {
+  id            Int      @id @default(autoincrement())
+  slug          String   @unique
+  fromLabel     String
+  toLabel       String
+  fromLat       Float?
+  fromLng       Float?
+  toLat         Float?
+  toLng         Float?
+  durationMin   Int?
+  priceFcfa     Int?
+  advice        String?  @db.Text
+  optionId      Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  option        TransportOption? @relation(fields: [optionId], references: [id], onDelete: SetNull)
+}
+
+// ============================= MODULE ACTIVITES (Maguette) =============================
+// Modeles de base fournis comme point de depart : a completer sur la branche
+// feature/activites-maguette (agenda, lieux, communautes, recommandations).
+
+enum EventCategory {
+  CULTUREL
+  SPORTIF
+  FESTIF
+  ETUDIANT
+  CONFERENCE
+  AUTRE
+}
+
+model Event {
+  id          Int           @id @default(autoincrement())
+  slug        String        @unique
+  title       String
+  category    EventCategory @default(CULTUREL)
+  description String        @db.Text
+  venue       String?
+  city        String
+  latitude    Float?
+  longitude   Float?
+  startsAt    DateTime
+  endsAt      DateTime?
+  priceFcfa   Int?
+  imageUrl    String?
+  organizer   String?
+  ticketLink  String?
+  isApproved  Boolean       @default(false)
+  createdById Int?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([city])
+  @@index([startsAt])
+}
+
+model Venue {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique
+  name        String
+  category    String // Restaurant, Plage, Site touristique, Salle de sport...
+  city        String
+  address     String?
+  description String   @db.Text
+  latitude    Float?
+  longitude   Float?
+  priceRange  String?
+  imageUrl    String?
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([city])
+}
+
+model Community {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique
+  name        String
+  kind        String // Nationalite, Centre d'interet
+  description String   @db.Text
+  contactLink String?
+  memberCount Int      @default(0)
+  createdAt   DateTime @default(now())
+}

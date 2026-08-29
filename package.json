@@ -1,0 +1,25 @@
+{
+  "name": "unigo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "UNIGO - Plateforme web pour les etudiants etrangers au Senegal (Universite, Transport, Activites)",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "install:all": "npm install",
+    "db:setup": "npm run prisma:generate -w server && npm run prisma:push -w server && npm run seed -w server",
+    "dev": "concurrently -n API,WEB -c cyan,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
+    "dev:server": "npm run dev -w server",
+    "dev:client": "npm run dev -w client",
+    "build": "npm run build -w client",
+    "seed": "npm run seed -w server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
