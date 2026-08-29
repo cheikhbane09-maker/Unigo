@@ -11,3 +11,8 @@ Thumbs.db
 .idea/
 server/prisma/dev.db
 coverage/
+
+# Archives et dossiers temporaires (livraison)
+UNIGO.zip
+_to_delete/
+_tmp_extract/
