@@ -17,6 +17,22 @@ const DEGREE_LABELS = {
   AUTRE: 'Autre',
 };
 
+/* Liste déroulante de filtre. Définie hors du composant pour que React
+   ne la démonte pas à chaque rendu (sinon le champ perdrait le focus). */
+function FilterSelect({ name, label, value, options, allLabel, onChange, render = (o) => o }) {
+  return (
+    <div>
+      <label className="label" htmlFor={`f-${name}`}>{label}</label>
+      <select id={`f-${name}`} className="input" value={value} onChange={(e) => onChange(name, e.target.value)}>
+        <option value="">{allLabel}</option>
+        {(options || []).map((o) => (
+          <option key={o} value={o}>{render(o)}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 export default function Universities() {
   const { t } = useI18n();
   const compare = useCompare();
@@ -57,23 +73,6 @@ export default function Universities() {
 
   const reset = () => setParams(new URLSearchParams());
 
-  const Select = ({ name, label, options, render = (o) => o }) => (
-    <div>
-      <label className="label" htmlFor={`f-${name}`}>{label}</label>
-      <select
-        id={`f-${name}`}
-        className="input"
-        value={query[name] || ''}
-        onChange={(e) => update(name, e.target.value)}
-      >
-        <option value="">{t('uni.all')}</option>
-        {(options || []).map((o) => (
-          <option key={o} value={o}>{render(o)}</option>
-        ))}
-      </select>
-    </div>
-  );
-
   return (
     <>
       <PageHeader title={t('uni.title')} subtitle={t('uni.subtitle')}>
@@ -113,21 +112,48 @@ export default function Universities() {
                   </div>
                 </div>
 
-                <Select name="city" label={t('uni.filters.city')} options={filters?.cities} />
-                <Select
+                <FilterSelect
+                  name="city"
+                  label={t('uni.filters.city')}
+                  options={filters?.cities}
+                  value={query.city || ''}
+                  allLabel={t('uni.all')}
+                  onChange={update}
+                />
+                <FilterSelect
                   name="type"
                   label={t('uni.filters.type')}
                   options={filters?.types}
+                  value={query.type || ''}
+                  allLabel={t('uni.all')}
+                  onChange={update}
                   render={(o) => (o === 'PUBLIQUE' ? t('uni.public') : t('uni.private'))}
                 />
-                <Select name="field" label={t('uni.filters.field')} options={filters?.fields} />
-                <Select
+                <FilterSelect
+                  name="field"
+                  label={t('uni.filters.field')}
+                  options={filters?.fields}
+                  value={query.field || ''}
+                  allLabel={t('uni.all')}
+                  onChange={update}
+                />
+                <FilterSelect
                   name="degree"
                   label={t('uni.filters.degree')}
                   options={filters?.degrees}
+                  value={query.degree || ''}
+                  allLabel={t('uni.all')}
+                  onChange={update}
                   render={(o) => DEGREE_LABELS[o] || o}
                 />
-                <Select name="language" label={t('uni.filters.language')} options={filters?.languages} />
+                <FilterSelect
+                  name="language"
+                  label={t('uni.filters.language')}
+                  options={filters?.languages}
+                  value={query.language || ''}
+                  allLabel={t('uni.all')}
+                  onChange={update}
+                />
 
                 <div>
                   <label className="label" htmlFor="f-budget">
