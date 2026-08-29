@@ -167,17 +167,68 @@ Conformément à la section 5 du cahier des charges :
 - Jetons de réinitialisation **à usage unique**, valables 30 minutes, stockés hachés (SHA-256).
 - **Limitation des tentatives** de connexion (10 essais / 15 min) et des demandes de réinitialisation.
 - En-têtes de sécurité **Helmet**, **CORS** restreint au front-end, corps de requête limité à 1 Mo.
-- Validation systématique des entrées avec **Zod** (protection contre les données malformées).
+- Vérification de toutes les données reçues côté serveur (`if` explicites dans chaque route) :
+  on ne fait jamais confiance à ce qui vient du navigateur.
 - Requêtes SQL générées par **Prisma** (requêtes paramétrées → protection contre l'injection SQL).
 - React échappe le contenu par défaut (protection XSS).
 
 > En production : servir le site en **HTTPS**, remplacer `JWT_SECRET` par une valeur longue et
 > aléatoire, et activer les sauvegardes automatiques de la base.
 
-## 7. Travail en équipe
+## 7. Comment lire le code (pour débuter)
+
+Le code est volontairement écrit de façon simple et répétitive : une fois qu'on a
+compris **une** route, on les comprend toutes.
+
+**Une route de l'API suit toujours le même plan :**
+
+```js
+router.post('/mon-adresse', async (req, res) => {
+  try {
+    // 1. on récupère ce qui a été envoyé par le formulaire
+    const { titre } = req.body;
+
+    // 2. on vérifie que c'est correct
+    if (!titre) {
+      return res.status(400).json({ error: 'Le titre est obligatoire.' });
+    }
+
+    // 3. on parle à la base de données
+    const resultat = await prisma.maTable.create({ data: { titre } });
+
+    // 4. on renvoie la réponse
+    res.status(201).json({ data: resultat });
+  } catch (erreur) {
+    console.error(erreur);
+    res.status(500).json({ error: 'Message affiché à l\'utilisateur.' });
+  }
+});
+```
+
+**Une page React suit toujours le même plan :**
+
+```jsx
+const [donnees, setDonnees] = useState([]);        // 1. la mémoire de la page
+
+useEffect(() => {                                   // 2. au chargement, on appelle l'API
+  get('/universities').then((r) => setDonnees(r.data));
+}, []);
+
+return <div>{donnees.map((u) => <p key={u.id}>{u.name}</p>)}</div>;  // 3. l'affichage
+```
+
+Les codes de réponse utilisés : **200** tout va bien · **201** créé · **400** données
+invalides · **401** pas connecté · **403** pas le droit · **404** introuvable ·
+**409** existe déjà · **500** erreur du serveur.
+
+Fichiers à lire en premier pour comprendre l'ensemble :
+`server/src/index.js`, puis `server/src/routes/auth.routes.js`,
+puis `client/src/App.jsx` et `client/src/pages/Login.jsx`.
+
+## 8. Travail en équipe
 
 Chaque membre travaille sur sa branche puis ouvre une *pull request* vers `main`.
-La marche à suivre détaillée se trouve dans **GUIDE_GIT_UNIGO.docx** (à la racine du projet).
+La marche à suivre détaillée se trouve dans **GUIDE_UNIGO_VSCODE.docx** (à la racine du projet).
 
 ```bash
 git checkout main
@@ -189,7 +240,7 @@ git commit -m "feat(transport): ajout des filtres par mode"
 git push origin feature/mon-module
 ```
 
-## 8. Reste à faire
+## 9. Reste à faire
 
 - **Transport (Binta)** : filtres par mode, fiches détaillées, carte interactive, annuaire des prestataires.
 - **Activités (Maguette)** : filtres agenda, détail d'un événement, formulaire de proposition, recommandations.

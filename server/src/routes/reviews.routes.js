@@ -1,75 +1,88 @@
+/* ===================================================================
+ * AVIS ET NOTES sur les établissements
+ * =================================================================== */
+
 import { Router } from 'express';
-import { z } from 'zod';
 import prisma from '../lib/prisma.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
-import { ah } from '../middleware/error.js';
 
 const router = Router();
 
-const reviewSchema = z.object({
-  universityId: z.coerce.number().int(),
-  rating: z.coerce.number().int().min(1).max(5),
-  title: z.string().max(120).optional().nullable(),
-  comment: z.string().min(10, 'Votre avis doit contenir au moins 10 caractères.'),
-});
+/* -------------------------------------------------------------------
+ * POST /api/reviews — déposer (ou modifier) son avis
+ * Un utilisateur ne peut laisser qu'UN seul avis par établissement.
+ * ----------------------------------------------------------------- */
 
-/** POST /api/reviews — deposer ou mettre a jour son avis (1 avis par universite) */
-router.post(
-  '/',
-  requireAuth,
-  ah(async (req, res) => {
-    const data = reviewSchema.parse(req.body);
+router.post('/', requireAuth, async (req, res) => {
+  try {
+    const { universityId, rating, title, comment } = req.body;
 
-    const review = await prisma.review.upsert({
-      where: { userId_universityId: { userId: req.user.id, universityId: data.universityId } },
-      create: { ...data, userId: req.user.id, isApproved: false },
-      update: { rating: data.rating, title: data.title, comment: data.comment, isApproved: false },
+    // Vérifications
+    const note = Number(rating);
+    if (!universityId) {
+      return res.status(400).json({ error: "L'établissement est obligatoire." });
+    }
+    if (!note || note < 1 || note > 5) {
+      return res.status(400).json({ error: 'La note doit être comprise entre 1 et 5.' });
+    }
+    if (!comment || comment.trim().length < 10) {
+      return res.status(400).json({ error: 'Votre avis doit contenir au moins 10 caractères.' });
+    }
+
+    // A-t-il déjà donné son avis sur cet établissement ?
+    const avisExistant = await prisma.review.findFirst({
+      where: { userId: req.user.id, universityId: Number(universityId) },
     });
+
+    let avis;
+    if (avisExistant) {
+      // On met à jour l'ancien avis, qui repasse en modération.
+      avis = await prisma.review.update({
+        where: { id: avisExistant.id },
+        data: { rating: note, title: title || null, comment, isApproved: false },
+      });
+    } else {
+      avis = await prisma.review.create({
+        data: {
+          userId: req.user.id,
+          universityId: Number(universityId),
+          rating: note,
+          title: title || null,
+          comment,
+          isApproved: false, // un modérateur devra le valider
+        },
+      });
+    }
 
     res.status(201).json({
-      data: review,
+      data: avis,
       message: 'Merci ! Votre avis sera publié après validation par un modérateur.',
     });
-  })
-);
+  } catch (erreur) {
+    console.error('Erreur dépôt avis :', erreur);
+    res.status(500).json({ error: "Impossible d'enregistrer votre avis." });
+  }
+});
 
-/** GET /api/reviews/mine — mes avis */
-router.get(
-  '/mine',
-  requireAuth,
-  ah(async (req, res) => {
-    const rows = await prisma.review.findMany({
+/* GET /api/reviews/mine — la liste de mes avis */
+router.get('/mine', requireAuth, async (req, res) => {
+  try {
+    const avis = await prisma.review.findMany({
       where: { userId: req.user.id },
       include: { university: { select: { name: true, slug: true } } },
       orderBy: { createdAt: 'desc' },
     });
-    res.json({ data: rows });
-  })
-);
+    res.json({ data: avis });
+  } catch (erreur) {
+    console.error('Erreur liste de mes avis :', erreur);
+    res.status(500).json({ error: 'Impossible de charger vos avis.' });
+  }
+});
 
-/** DELETE /api/reviews/:id — supprimer son avis (ou n'importe lequel si admin) */
-router.delete(
-  '/:id',
-  requireAuth,
-  ah(async (req, res) => {
-    const review = await prisma.review.findUnique({ where: { id: Number(req.params.id) } });
-    if (!review) return res.status(404).json({ error: 'Avis introuvable.' });
-    if (review.userId !== req.user.id && req.user.role !== 'ADMIN') {
-      return res.status(403).json({ error: 'Action non autorisée.' });
-    }
-    await prisma.review.delete({ where: { id: review.id } });
-    res.json({ message: 'Avis supprimé.' });
-  })
-);
-
-/* ----------------------------- Moderation ----------------------------- */
-
-router.get(
-  '/pending',
-  requireAuth,
-  requireRole('ADMIN'),
-  ah(async (_req, res) => {
-    const rows = await prisma.review.findMany({
+/* GET /api/reviews/pending — avis en attente de modération (admin) */
+router.get('/pending', requireAuth, requireRole('ADMIN'), async (_req, res) => {
+  try {
+    const avis = await prisma.review.findMany({
       where: { isApproved: false },
       include: {
         user: { select: { fullName: true, email: true } },
@@ -77,21 +90,47 @@ router.get(
       },
       orderBy: { createdAt: 'asc' },
     });
-    res.json({ data: rows });
-  })
-);
+    res.json({ data: avis });
+  } catch (erreur) {
+    console.error('Erreur avis en attente :', erreur);
+    res.status(500).json({ error: 'Impossible de charger les avis en attente.' });
+  }
+});
 
-router.patch(
-  '/:id/approve',
-  requireAuth,
-  requireRole('ADMIN'),
-  ah(async (req, res) => {
-    const updated = await prisma.review.update({
+/* PATCH /api/reviews/:id/approve — publier un avis (admin) */
+router.patch('/:id/approve', requireAuth, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const avis = await prisma.review.update({
       where: { id: Number(req.params.id) },
       data: { isApproved: true },
     });
-    res.json({ data: updated });
-  })
-);
+    res.json({ data: avis });
+  } catch (erreur) {
+    console.error('Erreur approbation avis :', erreur);
+    res.status(500).json({ error: "Impossible d'approuver cet avis." });
+  }
+});
+
+/* DELETE /api/reviews/:id — supprimer son propre avis (ou n'importe lequel si admin) */
+router.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const avis = await prisma.review.findUnique({ where: { id: Number(req.params.id) } });
+
+    if (!avis) {
+      return res.status(404).json({ error: 'Avis introuvable.' });
+    }
+
+    // On vérifie que l'avis appartient bien à la personne connectée.
+    if (avis.userId !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Vous ne pouvez supprimer que vos propres avis.' });
+    }
+
+    await prisma.review.delete({ where: { id: avis.id } });
+    res.json({ message: 'Avis supprimé.' });
+  } catch (erreur) {
+    console.error('Erreur suppression avis :', erreur);
+    res.status(500).json({ error: 'Impossible de supprimer cet avis.' });
+  }
+});
 
 export default router;

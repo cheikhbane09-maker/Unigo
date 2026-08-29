@@ -1,14 +1,24 @@
+/* ===================================================================
+ * POINT D'ENTRÉE DE L'API UNIGO
+ * -------------------------------------------------------------------
+ * C'est le fichier lancé par « npm run dev ».
+ * Il fait trois choses, dans l'ordre :
+ *   1. il active les protections de sécurité
+ *   2. il branche les fichiers de routes (une adresse = un fichier)
+ *   3. il démarre le serveur sur le port 4000
+ * =================================================================== */
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 
-import { env, isProd } from './config/env.js';
+import { env } from './config/env.js';
 import { notFound, errorHandler } from './middleware/error.js';
 import { optionalAuth } from './middleware/auth.js';
 
+// Un fichier de routes par grande partie du site
 import authRoutes from './routes/auth.routes.js';
 import universitiesRoutes from './routes/universities.routes.js';
 import reviewsRoutes from './routes/reviews.routes.js';
@@ -22,48 +32,51 @@ import activitiesRoutes from './routes/activities.routes.js';
 
 const app = express();
 
-app.set('trust proxy', 1);
+/* ------------------------- 1. SÉCURITÉ ---------------------------- */
 
-// Securite : en-tetes HTTP, CORS restreint au front, parsing JSON limite.
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(
-  cors({
-    origin: [env.clientUrl, 'http://localhost:5173', 'http://127.0.0.1:5173'],
-    credentials: true,
-  })
-);
+// helmet ajoute des en-têtes de sécurité recommandés sur chaque réponse.
+app.use(helmet());
+
+// cors autorise uniquement notre site React à appeler l'API.
+app.use(cors({ origin: env.clientUrl }));
+
+// Permet de lire le JSON envoyé par les formulaires (req.body), limité à 1 Mo.
 app.use(express.json({ limit: '1mb' }));
-app.use(cookieParser());
-app.use(morgan(isProd ? 'combined' : 'dev'));
 
-// Limitation globale des requetes (anti-abus).
-app.use(
-  '/api',
-  rateLimit({ windowMs: 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false })
-);
+// morgan affiche chaque requête dans la console : pratique pour déboguer.
+app.use(morgan('dev'));
 
-app.get('/api/health', (_req, res) =>
-  res.json({ status: 'ok', service: 'UNIGO API', time: new Date().toISOString() })
-);
+// Limite générale : 300 requêtes par minute et par visiteur.
+app.use('/api', rateLimit({ windowMs: 60 * 1000, max: 300 }));
 
+/* ------------------------- 2. LES ROUTES -------------------------- */
+
+// Petite adresse de test : ouvrez http://localhost:4000/api/health
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', service: 'UNIGO API' });
+});
+
+// Si un jeton valide est présent, req.user sera rempli pour toutes les routes.
 app.use(optionalAuth);
 
-app.use('/api/auth', authRoutes);
-app.use('/api/universities', universitiesRoutes);
-app.use('/api/reviews', reviewsRoutes);
-app.use('/api/favorites', favoritesRoutes);
-app.use('/api/procedures', proceduresRoutes);
-app.use('/api/testimonials', testimonialsRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/search', searchRoutes);
-app.use('/api/transport', transportRoutes); // module Binta
-app.use('/api/activities', activitiesRoutes); // module Maguette
+app.use('/api/auth', authRoutes); // inscription, connexion, mot de passe
+app.use('/api/universities', universitiesRoutes); // module Université
+app.use('/api/reviews', reviewsRoutes); // avis
+app.use('/api/favorites', favoritesRoutes); // favoris
+app.use('/api/procedures', proceduresRoutes); // guide des démarches
+app.use('/api/testimonials', testimonialsRoutes); // témoignages
+app.use('/api/admin', adminRoutes); // back-office
+app.use('/api/search', searchRoutes); // recherche globale
+app.use('/api/transport', transportRoutes); // module Transport — Binta
+app.use('/api/activities', activitiesRoutes); // module Activités — Maguette
 
+// Si aucune route ne correspond, puis filet de sécurité pour les erreurs.
 app.use(notFound);
 app.use(errorHandler);
 
+/* ------------------------- 3. DÉMARRAGE --------------------------- */
+
 app.listen(env.port, () => {
-  console.log(`\n  UNIGO API démarrée sur http://localhost:${env.port}`);
-  console.log(`  Front-end attendu sur ${env.clientUrl}`);
-  console.log(`  Environnement : ${env.nodeEnv}\n`);
+  console.log(`\n  API UNIGO démarrée sur http://localhost:${env.port}`);
+  console.log(`  Site React attendu sur ${env.clientUrl}\n`);
 });

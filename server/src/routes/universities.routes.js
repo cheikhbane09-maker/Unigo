@@ -1,154 +1,201 @@
+/* ===================================================================
+ * MODULE UNIVERSITÉ — annuaire, filtres, comparateur, filières
+ * Responsable : Kaiju
+ * =================================================================== */
+
 import { Router } from 'express';
-import { z } from 'zod';
 import prisma from '../lib/prisma.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
-import { ah } from '../middleware/error.js';
 
 const router = Router();
 
-/* Calcule note moyenne + nombre d'avis approuves pour une liste d'universites. */
-async function attachRatings(universities) {
-  if (universities.length === 0) return universities;
-  const ids = universities.map((u) => u.id);
-  const grouped = await prisma.review.groupBy({
+/**
+ * Calcule la note moyenne et le nombre d'avis pour une liste d'universités,
+ * puis ajoute ces deux informations à chaque université.
+ */
+async function ajouterLesNotes(universites) {
+  if (universites.length === 0) return universites;
+
+  const ids = universites.map((u) => u.id);
+
+  // groupBy = « regroupe les avis par université et fais la moyenne des notes »
+  const groupes = await prisma.review.groupBy({
     by: ['universityId'],
     where: { universityId: { in: ids }, isApproved: true },
     _avg: { rating: true },
     _count: { rating: true },
   });
-  const map = new Map(grouped.map((g) => [g.universityId, g]));
-  return universities.map((u) => ({
-    ...u,
-    rating: Number((map.get(u.id)?._avg.rating || 0).toFixed(2)),
-    reviewCount: map.get(u.id)?._count.rating || 0,
-  }));
+
+  return universites.map((u) => {
+    const groupe = groupes.find((g) => g.universityId === u.id);
+    return {
+      ...u,
+      rating: groupe ? Number(groupe._avg.rating.toFixed(2)) : 0,
+      reviewCount: groupe ? groupe._count.rating : 0,
+    };
+  });
 }
 
-/**
+/* ===================================================================
  * GET /api/universities
- * Filtres : q, city, type, field, degree, language, budgetMax, housing, page, limit, sort
- */
-router.get(
-  '/',
-  ah(async (req, res) => {
-    const {
-      q,
-      city,
-      type,
-      field,
-      degree,
-      language,
-      budgetMax,
-      housing,
-      sort = 'name',
-      page = '1',
-      limit = '12',
-    } = req.query;
+ * Liste des établissements, avec filtres et pagination.
+ * Exemple : /api/universities?city=Dakar&degree=MASTER&page=2
+ * =================================================================== */
 
-    const take = Math.min(Number(limit) || 12, 50);
-    const skip = (Math.max(Number(page) || 1, 1) - 1) * take;
+router.get('/', async (req, res) => {
+  try {
+    const { q, city, type, field, degree, language, budgetMax, housing, sort, page, limit } = req.query;
 
-    const programFilter = {};
-    if (field) programFilter.field = { equals: String(field) };
-    if (degree) programFilter.degree = String(degree);
-    if (language) programFilter.language = { contains: String(language) };
-    if (budgetMax) programFilter.tuitionFcfa = { lte: Number(budgetMax) };
+    // Pagination : 12 résultats par page par défaut, 50 au maximum.
+    const parPage = Math.min(Number(limit) || 12, 50);
+    const pageActuelle = Math.max(Number(page) || 1, 1);
+    const aSauter = (pageActuelle - 1) * parPage;
 
-    const where = {
-      isPublished: true,
-      ...(city ? { city: { equals: String(city) } } : {}),
-      ...(type ? { type: String(type) } : {}),
-      ...(housing === 'true' ? { hasCampusHousing: true } : {}),
-      ...(q
-        ? {
-            OR: [
-              { name: { contains: String(q) } },
-              { acronym: { contains: String(q) } },
-              { city: { contains: String(q) } },
-              { description: { contains: String(q) } },
-            ],
-          }
-        : {}),
-      ...(Object.keys(programFilter).length ? { programs: { some: programFilter } } : {}),
-    };
+    // Filtres qui portent sur les filières (un objet vide = pas de filtre).
+    const filtreFilieres = {};
+    if (field) filtreFilieres.field = field;
+    if (degree) filtreFilieres.degree = degree;
+    if (language) filtreFilieres.language = { contains: language };
+    if (budgetMax) filtreFilieres.tuitionFcfa = { lte: Number(budgetMax) };
 
-    const orderBy =
-      sort === 'city' ? { city: 'asc' } : sort === 'recent' ? { createdAt: 'desc' } : { name: 'asc' };
+    // Filtres qui portent sur l'établissement lui-même.
+    const where = { isPublished: true };
+    if (city) where.city = city;
+    if (type) where.type = type;
+    if (housing === 'true') where.hasCampusHousing = true;
+    if (q) {
+      // OR = « le texte cherché est dans le nom OU le sigle OU la ville OU la description »
+      where.OR = [
+        { name: { contains: q } },
+        { acronym: { contains: q } },
+        { city: { contains: q } },
+        { description: { contains: q } },
+      ];
+    }
+    if (Object.keys(filtreFilieres).length > 0) {
+      where.programs = { some: filtreFilieres }; // au moins une filière correspond
+    }
 
-    const [rows, total] = await Promise.all([
-      prisma.university.findMany({
-        where,
-        orderBy,
-        skip,
-        take,
-        include: {
-          programs: {
-            select: { id: true, name: true, field: true, degree: true, tuitionFcfa: true },
-          },
-        },
-      }),
-      prisma.university.count({ where }),
-    ]);
+    // Tri
+    let orderBy = { name: 'asc' };
+    if (sort === 'city') orderBy = { city: 'asc' };
+    if (sort === 'recent') orderBy = { createdAt: 'desc' };
 
-    res.json({
-      data: await attachRatings(rows),
-      pagination: { total, page: Number(page) || 1, limit: take, pages: Math.ceil(total / take) },
+    const universites = await prisma.university.findMany({
+      where,
+      orderBy,
+      skip: aSauter,
+      take: parPage,
+      include: {
+        programs: { select: { id: true, name: true, field: true, degree: true, tuitionFcfa: true } },
+      },
     });
-  })
-);
 
-/** GET /api/universities/filters — valeurs disponibles pour alimenter les filtres */
-router.get(
-  '/filters',
-  ah(async (_req, res) => {
-    const [cities, fields, languages, maxTuition] = await Promise.all([
-      prisma.university.findMany({
-        where: { isPublished: true },
-        select: { city: true },
-        distinct: ['city'],
-        orderBy: { city: 'asc' },
-      }),
-      prisma.program.findMany({ select: { field: true }, distinct: ['field'], orderBy: { field: 'asc' } }),
-      prisma.program.findMany({ select: { language: true }, distinct: ['language'] }),
-      prisma.program.aggregate({ _max: { tuitionFcfa: true } }),
-    ]);
+    const total = await prisma.university.count({ where });
 
     res.json({
-      cities: cities.map((c) => c.city),
-      fields: fields.map((f) => f.field),
-      languages: [...new Set(languages.flatMap((l) => l.language.split('/').map((s) => s.trim())))],
+      data: await ajouterLesNotes(universites),
+      pagination: {
+        total,
+        page: pageActuelle,
+        limit: parPage,
+        pages: Math.ceil(total / parPage),
+      },
+    });
+  } catch (erreur) {
+    console.error('Erreur liste universités :', erreur);
+    res.status(500).json({ error: 'Impossible de charger les établissements.' });
+  }
+});
+
+/* ===================================================================
+ * GET /api/universities/filters
+ * Renvoie les valeurs possibles pour remplir les listes déroulantes
+ * de la page de recherche (villes, domaines, langues…).
+ * =================================================================== */
+
+router.get('/filters', async (_req, res) => {
+  try {
+    const villes = await prisma.university.findMany({
+      where: { isPublished: true },
+      select: { city: true },
+      distinct: ['city'],
+      orderBy: { city: 'asc' },
+    });
+
+    const domaines = await prisma.program.findMany({
+      select: { field: true },
+      distinct: ['field'],
+      orderBy: { field: 'asc' },
+    });
+
+    const langues = await prisma.program.findMany({
+      select: { language: true },
+      distinct: ['language'],
+    });
+
+    const fraisMax = await prisma.program.aggregate({ _max: { tuitionFcfa: true } });
+
+    // « Francais/Anglais » compte pour deux langues : on découpe et on dédoublonne.
+    const listeLangues = [];
+    langues.forEach((l) => {
+      l.language.split('/').forEach((langue) => {
+        const propre = langue.trim();
+        if (propre && !listeLangues.includes(propre)) listeLangues.push(propre);
+      });
+    });
+
+    res.json({
+      cities: villes.map((v) => v.city),
+      fields: domaines.map((d) => d.field),
+      languages: listeLangues,
       degrees: ['LICENCE', 'MASTER', 'DOCTORAT', 'BTS', 'DUT', 'AUTRE'],
       types: ['PUBLIQUE', 'PRIVEE'],
-      maxTuition: maxTuition._max.tuitionFcfa || 0,
+      maxTuition: fraisMax._max.tuitionFcfa || 0,
     });
-  })
-);
+  } catch (erreur) {
+    console.error('Erreur filtres :', erreur);
+    res.status(500).json({ error: 'Impossible de charger les filtres.' });
+  }
+});
 
-/** GET /api/universities/compare?ids=1,2,3 — comparateur */
-router.get(
-  '/compare',
-  ah(async (req, res) => {
+/* ===================================================================
+ * GET /api/universities/compare?ids=1,2,3
+ * Comparateur : renvoie les établissements demandés (4 maximum).
+ * =================================================================== */
+
+router.get('/compare', async (req, res) => {
+  try {
     const ids = String(req.query.ids || '')
       .split(',')
       .map((n) => Number(n.trim()))
-      .filter(Boolean)
+      .filter((n) => !isNaN(n) && n > 0)
       .slice(0, 4);
 
-    if (ids.length === 0) return res.json({ data: [] });
+    if (ids.length === 0) {
+      return res.json({ data: [] });
+    }
 
-    const rows = await prisma.university.findMany({
+    const universites = await prisma.university.findMany({
       where: { id: { in: ids } },
       include: { programs: true },
     });
-    res.json({ data: await attachRatings(rows) });
-  })
-);
 
-/** GET /api/universities/:slug — fiche detaillee */
-router.get(
-  '/:slug',
-  ah(async (req, res) => {
-    const university = await prisma.university.findUnique({
+    res.json({ data: await ajouterLesNotes(universites) });
+  } catch (erreur) {
+    console.error('Erreur comparateur :', erreur);
+    res.status(500).json({ error: 'Impossible de charger le comparateur.' });
+  }
+});
+
+/* ===================================================================
+ * GET /api/universities/:slug
+ * Fiche détaillée d'un établissement (avec ses filières et ses avis).
+ * =================================================================== */
+
+router.get('/:slug', async (req, res) => {
+  try {
+    const universite = await prisma.university.findUnique({
       where: { slug: req.params.slug },
       include: {
         programs: { orderBy: [{ degree: 'asc' }, { name: 'asc' }] },
@@ -161,107 +208,141 @@ router.get(
       },
     });
 
-    if (!university) return res.status(404).json({ error: 'Université introuvable.' });
+    if (!universite) {
+      return res.status(404).json({ error: 'Université introuvable.' });
+    }
 
-    const [withRating] = await attachRatings([university]);
-    res.json({ data: withRating });
-  })
-);
-
-/* --------------------------- Administration --------------------------- */
-
-const universitySchema = z.object({
-  slug: z.string().min(2),
-  name: z.string().min(2),
-  acronym: z.string().optional().nullable(),
-  type: z.enum(['PUBLIQUE', 'PRIVEE']).default('PUBLIQUE'),
-  city: z.string().min(2),
-  region: z.string().optional().nullable(),
-  address: z.string().optional().nullable(),
-  description: z.string().min(10),
-  website: z.string().optional().nullable(),
-  email: z.string().optional().nullable(),
-  phone: z.string().optional().nullable(),
-  logoUrl: z.string().optional().nullable(),
-  latitude: z.coerce.number().optional().nullable(),
-  longitude: z.coerce.number().optional().nullable(),
-  foundedYear: z.coerce.number().optional().nullable(),
-  studentCount: z.coerce.number().optional().nullable(),
-  languages: z.string().default('Francais'),
-  admissionInfo: z.string().optional().nullable(),
-  scholarships: z.string().optional().nullable(),
-  hasCampusHousing: z.boolean().default(false),
-  isPublished: z.boolean().default(true),
+    const [avecNote] = await ajouterLesNotes([universite]);
+    res.json({ data: avecNote });
+  } catch (erreur) {
+    console.error('Erreur fiche université :', erreur);
+    res.status(500).json({ error: "Impossible de charger la fiche de l'établissement." });
+  }
 });
 
-router.post(
-  '/',
-  requireAuth,
-  requireRole('ADMIN'),
-  ah(async (req, res) => {
-    const data = universitySchema.parse(req.body);
-    const created = await prisma.university.create({ data });
-    res.status(201).json({ data: created });
-  })
-);
+/* ===================================================================
+ * ADMINISTRATION — réservé aux comptes ADMIN
+ * =================================================================== */
 
-router.put(
-  '/:id',
-  requireAuth,
-  requireRole('ADMIN'),
-  ah(async (req, res) => {
-    const data = universitySchema.partial().parse(req.body);
-    const updated = await prisma.university.update({
+// Ajouter un établissement
+router.post('/', requireAuth, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { slug, name, city, description } = req.body;
+
+    if (!slug || !name || !city || !description) {
+      return res.status(400).json({ error: 'Nom, slug, ville et description sont obligatoires.' });
+    }
+
+    const universite = await prisma.university.create({
+      data: {
+        slug: slug.trim(),
+        name: name.trim(),
+        acronym: req.body.acronym || null,
+        type: req.body.type === 'PRIVEE' ? 'PRIVEE' : 'PUBLIQUE',
+        city: city.trim(),
+        region: req.body.region || null,
+        address: req.body.address || null,
+        description,
+        website: req.body.website || null,
+        email: req.body.email || null,
+        phone: req.body.phone || null,
+        latitude: req.body.latitude ? Number(req.body.latitude) : null,
+        longitude: req.body.longitude ? Number(req.body.longitude) : null,
+        foundedYear: req.body.foundedYear ? Number(req.body.foundedYear) : null,
+        studentCount: req.body.studentCount ? Number(req.body.studentCount) : null,
+        languages: req.body.languages || 'Francais',
+        admissionInfo: req.body.admissionInfo || null,
+        scholarships: req.body.scholarships || null,
+        hasCampusHousing: req.body.hasCampusHousing === true,
+      },
+    });
+
+    res.status(201).json({ data: universite });
+  } catch (erreur) {
+    if (erreur.code === 'P2002') {
+      return res.status(409).json({ error: 'Ce slug est déjà utilisé par un autre établissement.' });
+    }
+    console.error('Erreur création université :', erreur);
+    res.status(500).json({ error: "Impossible de créer l'établissement." });
+  }
+});
+
+// Modifier un établissement
+router.put('/:id', requireAuth, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const champsModifiables = [
+      'slug', 'name', 'acronym', 'type', 'city', 'region', 'address', 'description',
+      'website', 'email', 'phone', 'languages', 'admissionInfo', 'scholarships',
+      'hasCampusHousing', 'isPublished',
+    ];
+
+    const data = {};
+    champsModifiables.forEach((champ) => {
+      if (req.body[champ] !== undefined) data[champ] = req.body[champ];
+    });
+
+    const universite = await prisma.university.update({
       where: { id: Number(req.params.id) },
       data,
     });
-    res.json({ data: updated });
-  })
-);
 
-router.delete(
-  '/:id',
-  requireAuth,
-  requireRole('ADMIN'),
-  ah(async (req, res) => {
-    await prisma.university.delete({ where: { id: Number(req.params.id) } });
-    res.json({ message: 'Université supprimée.' });
-  })
-);
-
-/* ----------------------------- Filieres ------------------------------- */
-
-const programSchema = z.object({
-  name: z.string().min(2),
-  field: z.string().min(2),
-  degree: z.enum(['LICENCE', 'MASTER', 'DOCTORAT', 'BTS', 'DUT', 'AUTRE']).default('LICENCE'),
-  durationYears: z.coerce.number().int().min(1).max(8).default(3),
-  tuitionFcfa: z.coerce.number().int().min(0).default(0),
-  language: z.string().default('Francais'),
-  description: z.string().optional().nullable(),
-  admissionReq: z.string().optional().nullable(),
-  universityId: z.coerce.number().int(),
+    res.json({ data: universite });
+  } catch (erreur) {
+    console.error('Erreur modification université :', erreur);
+    res.status(500).json({ error: "Impossible de modifier l'établissement." });
+  }
 });
 
-router.post(
-  '/programs',
-  requireAuth,
-  requireRole('ADMIN'),
-  ah(async (req, res) => {
-    const data = programSchema.parse(req.body);
-    const created = await prisma.program.create({ data });
-    res.status(201).json({ data: created });
-  })
-);
+// Supprimer un établissement
+router.delete('/:id', requireAuth, requireRole('ADMIN'), async (req, res) => {
+  try {
+    await prisma.university.delete({ where: { id: Number(req.params.id) } });
+    res.json({ message: 'Établissement supprimé.' });
+  } catch (erreur) {
+    console.error('Erreur suppression université :', erreur);
+    res.status(500).json({ error: "Impossible de supprimer l'établissement." });
+  }
+});
 
-router.delete(
-  '/programs/:id',
-  requireAuth,
-  requireRole('ADMIN'),
-  ah(async (req, res) => {
+/* ------------------------------ Filières ------------------------------ */
+
+router.post('/programs', requireAuth, requireRole('ADMIN'), async (req, res) => {
+  try {
+    const { name, field, universityId } = req.body;
+
+    if (!name || !field || !universityId) {
+      return res.status(400).json({ error: 'Nom, domaine et établissement sont obligatoires.' });
+    }
+
+    const filiere = await prisma.program.create({
+      data: {
+        name: name.trim(),
+        field: field.trim(),
+        degree: req.body.degree || 'LICENCE',
+        durationYears: Number(req.body.durationYears) || 3,
+        tuitionFcfa: Number(req.body.tuitionFcfa) || 0,
+        language: req.body.language || 'Francais',
+        description: req.body.description || null,
+        admissionReq: req.body.admissionReq || null,
+        universityId: Number(universityId),
+      },
+    });
+
+    res.status(201).json({ data: filiere });
+  } catch (erreur) {
+    console.error('Erreur création filière :', erreur);
+    res.status(500).json({ error: 'Impossible de créer la filière.' });
+  }
+});
+
+router.delete('/programs/:id', requireAuth, requireRole('ADMIN'), async (req, res) => {
+  try {
     await prisma.program.delete({ where: { id: Number(req.params.id) } });
     res.json({ message: 'Filière supprimée.' });
-  })
-);
+  } catch (erreur) {
+    console.error('Erreur suppression filière :', erreur);
+    res.status(500).json({ error: 'Impossible de supprimer la filière.' });
+  }
+});
 
 export default router;

@@ -1,25 +1,27 @@
-import { ZodError } from 'zod';
+/* ===================================================================
+ * GESTION DES ERREURS
+ * -------------------------------------------------------------------
+ * Ces deux fonctions sont branchées tout à la fin de src/index.js.
+ * =================================================================== */
 
+/** Appelée quand aucune route ne correspond à l'adresse demandée. */
 export function notFound(_req, res) {
-  res.status(404).json({ error: 'Ressource introuvable.' });
+  res.status(404).json({ error: 'Cette adresse n\'existe pas sur l\'API.' });
 }
 
-export function errorHandler(err, _req, res, _next) {
-  if (err instanceof ZodError) {
-    return res.status(400).json({
-      error: 'Données invalides.',
-      details: err.errors.map((e) => ({ champ: e.path.join('.'), message: e.message })),
-    });
-  }
-  if (err?.code === 'P2002') {
+/**
+ * Filet de sécurité : attrape les erreurs qui n'auraient pas été
+ * gérées par un try / catch dans une route.
+ */
+export function errorHandler(erreur, _req, res, _next) {
+  // Codes d'erreur renvoyés par Prisma, traduits en messages compréhensibles.
+  if (erreur?.code === 'P2002') {
     return res.status(409).json({ error: 'Cette valeur existe déjà.' });
   }
-  if (err?.code === 'P2025') {
-    return res.status(404).json({ error: 'Ressource introuvable.' });
+  if (erreur?.code === 'P2025') {
+    return res.status(404).json({ error: 'Élément introuvable.' });
   }
-  console.error('[UNIGO] Erreur serveur :', err);
-  res.status(err.status || 500).json({ error: err.message || 'Erreur interne du serveur.' });
-}
 
-/** Enveloppe un handler async pour propager les erreurs vers errorHandler. */
-export const ah = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+  console.error('[UNIGO] Erreur serveur :', erreur);
+  res.status(500).json({ error: 'Erreur interne du serveur.' });
+}

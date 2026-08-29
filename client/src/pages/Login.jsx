@@ -1,3 +1,12 @@
+/* ===================================================================
+ * PAGE DE CONNEXION      adresse : /connexion
+ * -------------------------------------------------------------------
+ * Comment fonctionne un formulaire en React :
+ *   1. useState garde ce que l'utilisateur tape (email, password)
+ *   2. chaque <input> affiche cette valeur et la met à jour (onChange)
+ *   3. au clic sur le bouton, onSubmit envoie tout à l'API
+ * =================================================================== */
+
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -5,29 +14,36 @@ import { useI18n } from '../i18n/I18nContext.jsx';
 import AuthShell, { FormError } from '../components/AuthShell.jsx';
 
 export default function Login() {
-  const { t } = useI18n();
-  const { login } = useAuth();
-  const navigate = useNavigate();
+  const { t } = useI18n(); // t('cle') = le texte traduit en FR ou EN
+  const { login } = useAuth(); // la fonction qui appelle l'API de connexion
+  const navigate = useNavigate(); // pour changer de page après la connexion
   const location = useLocation();
 
+  // Les trois informations que la page doit retenir.
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState(null);
-  const [busy, setBusy] = useState(false);
+  const [motDePasse, setMotDePasse] = useState('');
+  const [erreur, setErreur] = useState(null);
+  const [enCours, setEnCours] = useState(false); // pour désactiver le bouton pendant l'envoi
 
-  const submit = async (e) => {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
+  // Appelée quand on valide le formulaire.
+  async function envoyer(event) {
+    event.preventDefault(); // empêche le navigateur de recharger la page
+    setErreur(null);
+    setEnCours(true);
+
     try {
-      await login(email, password);
+      // login() envoie l'e-mail et le mot de passe à POST /api/auth/login
+      await login(email, motDePasse);
+
+      // Si l'utilisateur voulait aller sur une page protégée, on l'y renvoie.
       navigate(location.state?.from || '/', { replace: true });
-    } catch (err) {
-      setError(err.message);
+    } catch (e) {
+      // L'API a répondu une erreur (mauvais mot de passe, trop d'essais…)
+      setErreur(e.message);
     } finally {
-      setBusy(false);
+      setEnCours(false);
     }
-  };
+  }
 
   return (
     <AuthShell
@@ -40,8 +56,9 @@ export default function Login() {
         </>
       }
     >
-      <form onSubmit={submit} className="space-y-4" noValidate>
-        <FormError message={error} />
+      <form onSubmit={envoyer} className="space-y-4" noValidate>
+        {/* Affiche le message d'erreur renvoyé par l'API, s'il y en a un */}
+        <FormError message={erreur} />
 
         <div>
           <label className="label" htmlFor="email">{t('auth.email')}</label>
@@ -67,15 +84,15 @@ export default function Login() {
             id="password"
             type="password"
             className="input"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            value={motDePasse}
+            onChange={(e) => setMotDePasse(e.target.value)}
             autoComplete="current-password"
             required
           />
         </div>
 
-        <button type="submit" className="btn-primary w-full" disabled={busy}>
-          {busy ? t('common.loading') : t('auth.submit.login')}
+        <button type="submit" className="btn-primary w-full" disabled={enCours}>
+          {enCours ? t('common.loading') : t('auth.submit.login')}
         </button>
       </form>
 
