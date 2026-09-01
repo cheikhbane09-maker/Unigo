@@ -1,141 +1,81 @@
-/* ===============================================================
- * MODULE TRANSPORT — responsable : Binta Comé
- * Branche de travail : feature/transport-binta
+/* ===================================================================
+ * MODULE TRANSPORT — Binta Comé      adresse : /transport
+ * -------------------------------------------------------------------
+ * Page de départ : les moyens de transport de Dakar et leurs tarifs.
+ * Les données sont dans src/data/donnees.js (tableau moyensTransport).
  *
- * Cette page est un point de départ fonctionnel : elle consomme
- * déjà /api/transport et /api/transport/routes.
- * À faire :
- *  - TODO : filtres par mode de transport et par zone
- *  - TODO : page de détail par moyen de transport
- *  - TODO : carte interactive (le composant <MapView /> est prêt,
- *           il suffit de lui passer des points {lat, lng, title})
- *  - TODO : annuaire des prestataires et liens utiles
- *  - TODO : conseils de sécurité par mode
- * =============================================================== */
-import { useEffect, useState } from 'react';
-import { get, formatFcfa } from '../lib/api.js';
-import { useI18n } from '../i18n/I18nContext.jsx';
-import { PageHeader } from '../components/Layout.jsx';
-import Spinner, { EmptyState } from '../components/Spinner.jsx';
-import { IconBus, IconInfo, IconArrow } from '../components/Icons.jsx';
+ * À FAIRE (Binta) :
+ *  - TODO : ajouter les trajets fréquents (aéroport ↔ campus, etc.)
+ *  - TODO : filtres par zone et par budget
+ *  - TODO : carte interactive des arrêts et gares
+ *  - TODO : annuaire des prestataires (Yango, Heetch, compagnies)
+ * =================================================================== */
 
-const MODE_LABELS = {
-  BUS: 'Bus urbain',
-  BRT: 'BRT',
-  TER: 'Train (TER)',
-  CAR_RAPIDE: 'Car rapide',
-  TAXI: 'Taxi',
-  VTC: 'VTC',
-  INTERURBAIN: 'Interurbain',
-};
+import { moyensTransport, formaterFcfa } from '../data/donnees.js';
+import { EnTetePage } from '../components/Layout.jsx';
 
 export default function Transport() {
-  const { t } = useI18n();
-  const [options, setOptions] = useState([]);
-  const [routes, setRoutes] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    Promise.all([get('/transport'), get('/transport/routes')])
-      .then(([o, r]) => {
-        setOptions(o.data);
-        setRoutes(r.data);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
   return (
     <>
-      <PageHeader title={t('home.module.transport.title')} subtitle={t('home.module.transport.desc')} />
+      <EnTetePage
+        titre="Se déplacer à Dakar"
+        sousTitre="Les moyens de transport, leurs tarifs indicatifs et les conseils à connaître."
+      />
 
-      <div className="container-page py-10">
-        <div className="mb-8 flex items-start gap-3 rounded-2xl border border-sand-200 bg-sand-50 p-5 text-sm text-sand-900">
-          <IconInfo size={20} className="mt-0.5 shrink-0" />
-          <div>
-            <p className="font-semibold">{t('module.wip.title')}</p>
-            <p className="mt-1">{t('module.wip.transport')}</p>
-          </div>
+      <div className="conteneur py-10">
+        {/* Les cartes des moyens de transport */}
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {moyensTransport.map((moyen) => (
+            <article key={moyen.id} className="carte flex flex-col">
+              <h2 className="text-lg font-bold text-ardoise-900">{moyen.nom}</h2>
+
+              <p className="mt-1 text-sm font-semibold text-brand-700">
+                {formaterFcfa(moyen.prixMin)} – {formaterFcfa(moyen.prixMax)}
+              </p>
+
+              <p className="mt-3 flex-1 text-sm leading-relaxed text-ardoise-600">
+                {moyen.description}
+              </p>
+
+              <p className="mt-4 rounded-xl bg-ardoise-100 p-3 text-xs text-ardoise-600">
+                💡 {moyen.conseil}
+              </p>
+            </article>
+          ))}
         </div>
 
-        {loading ? (
-          <Spinner />
-        ) : (
-          <>
-            <section>
-              <h2 className="font-display text-xl font-bold text-ink-900">Moyens de transport</h2>
-              {options.length === 0 ? (
-                <EmptyState title="Aucun moyen de transport enregistré pour le moment." />
-              ) : (
-                <div className="mt-5 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-                  {options.map((o) => (
-                    <article key={o.id} className="card flex flex-col p-6">
-                      <div className="flex items-center gap-3">
-                        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-sand-50 text-sand-700">
-                          <IconBus size={22} />
-                        </span>
-                        <div>
-                          <h3 className="font-display font-bold text-ink-900">{o.name}</h3>
-                          <span className="badge-muted">{MODE_LABELS[o.mode] || o.mode}</span>
-                        </div>
-                      </div>
-                      <p className="prose-unigo mt-4 flex-1">{o.description}</p>
-                      <dl className="mt-4 space-y-1.5 border-t border-ink-100 pt-4 text-sm">
-                        {o.coverageArea && (
-                          <div className="flex justify-between gap-3">
-                            <dt className="text-ink-400">Zone</dt>
-                            <dd className="text-right font-medium text-ink-800">{o.coverageArea}</dd>
-                          </div>
-                        )}
-                        {(o.priceMinFcfa || o.priceMaxFcfa) && (
-                          <div className="flex justify-between gap-3">
-                            <dt className="text-ink-400">Tarif indicatif</dt>
-                            <dd className="text-right font-medium text-ink-800">
-                              {formatFcfa(o.priceMinFcfa)}
-                              {o.priceMaxFcfa ? ` – ${formatFcfa(o.priceMaxFcfa)}` : ''}
-                            </dd>
-                          </div>
-                        )}
-                        {o.schedule && (
-                          <div className="flex justify-between gap-3">
-                            <dt className="text-ink-400">Horaires</dt>
-                            <dd className="text-right font-medium text-ink-800">{o.schedule}</dd>
-                          </div>
-                        )}
-                      </dl>
-                      {o.safetyTips && (
-                        <p className="mt-4 rounded-xl bg-ink-50 p-3 text-xs text-ink-600">⚠ {o.safetyTips}</p>
-                      )}
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
+        {/* Le même contenu sous forme de tableau récapitulatif */}
+        <h2 className="mt-14 text-xl font-bold text-ardoise-900">Récapitulatif des tarifs</h2>
+        <p className="mt-2 text-sm text-ardoise-600">
+          Ces fourchettes valent pour l'ensemble de l'agglomération de Dakar, quel que soit le campus.
+        </p>
 
-            {routes.length > 0 && (
-              <section className="mt-14">
-                <h2 className="font-display text-xl font-bold text-ink-900">Trajets fréquents</h2>
-                <div className="mt-5 grid gap-4 md:grid-cols-2">
-                  {routes.map((r) => (
-                    <article key={r.id} className="card p-5">
-                      <p className="flex flex-wrap items-center gap-2 font-display font-bold text-ink-900">
-                        {r.fromLabel}
-                        <IconArrow size={16} className="text-brand-600" />
-                        {r.toLabel}
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-ink-600">
-                        {r.durationMin && <span>⏱ ~{r.durationMin} min</span>}
-                        {r.priceFcfa ? <span>💰 {formatFcfa(r.priceFcfa)}</span> : null}
-                        {r.option?.name && <span className="badge-muted">{r.option.name}</span>}
-                      </div>
-                      {r.advice && <p className="prose-unigo mt-3">{r.advice}</p>}
-                    </article>
-                  ))}
-                </div>
-              </section>
-            )}
-          </>
-        )}
+        <div className="carte mt-5 overflow-x-auto p-0">
+          <table className="w-full min-w-[420px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-ardoise-100 bg-ardoise-50 text-xs uppercase tracking-wide text-ardoise-400">
+                <th className="p-4">Transport</th>
+                <th className="p-4">Tarif indicatif</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-ardoise-100">
+              {moyensTransport.map((moyen) => (
+                <tr key={moyen.id}>
+                  <td className="p-4 font-medium text-ardoise-900">{moyen.nom}</td>
+                  <td className="p-4 text-ardoise-600">
+                    {moyen.prixMin} – {moyen.prixMax} F
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <p className="mt-8 rounded-2xl bg-sable-50 p-4 text-sm text-sable-700">
+          Page en cours de développement par <strong>Binta Comé</strong> sur la branche
+          <code className="mx-1 rounded bg-white px-1.5 py-0.5">feature/transport-binta</code>.
+          Prochaine étape : les trajets fréquents entre l'aéroport, les campus et le centre-ville.
+        </p>
       </div>
     </>
   );

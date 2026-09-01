@@ -13,6 +13,35 @@ dédiée aux étudiants étrangers au Sénégal — Université · Transport · 
 
 ---
 
+## 0. Démarrage rapide — le frontend seul (2 minutes)
+
+Le front-end fonctionne **sans backend, sans MySQL et sans XAMPP** : il lit ses données
+dans `client/src/data/donnees.js`. C'est le moyen le plus rapide de voir le site.
+
+```bash
+cd client
+npm install
+npm run dev
+```
+
+Le navigateur s'ouvre tout seul sur http://localhost:5173
+
+| Adresse | Page |
+|---|---|
+| `/` | Accueil (page vitrine) |
+| `/inscription` | Créer un compte |
+| `/connexion` | Se connecter |
+| `/mot-de-passe-oublie` | Demander un lien de réinitialisation |
+| `/nouveau-mot-de-passe` | Choisir un nouveau mot de passe |
+| `/universites` | Annuaire des 9 établissements |
+| `/universites/cesag` | Fiche détaillée d'un établissement |
+| `/transport` | Module de Binta |
+| `/activites` | Module de Maguette |
+
+Les formulaires valident les saisies et affichent les erreurs, mais n'envoient encore rien
+au serveur : chaque page contient un commentaire `ÉTAPE SUIVANTE` qui indique où brancher
+l'appel à l'API.
+
 ## 1. Prérequis
 
 - **Node.js 18 ou plus** — https://nodejs.org (prendre la version LTS)
@@ -116,6 +145,7 @@ UNIGO/
 │        ├─ search.routes.js        → recherche globale multi-modules
 │        └─ admin.routes.js         → back-office
 └─ client/                   → front-end React
+   ├─ .env.example           → adresse de l'API (utile seulement si elle est hébergée ailleurs)
    └─ src/
       ├─ App.jsx             → toutes les routes de l'application
       ├─ components/         → Navbar, Footer, cartes, carte OSM, icônes…
@@ -135,6 +165,7 @@ UNIGO/
 | `npm run db:setup` | Génère le client Prisma, crée les tables et charge les données |
 | `npm run seed` | Recharge uniquement les données de démonstration |
 | `npm run build` | Construit la version de production du front-end |
+| `npm start` | Construit le site puis le sert avec l'API sur le port 4000 (production) |
 | `npm run prisma:studio -w server` | Ouvre une interface visuelle sur la base de données |
 
 ## 5. Principales routes de l'API
@@ -240,7 +271,48 @@ git commit -m "feat(transport): ajout des filtres par mode"
 git push origin feature/mon-module
 ```
 
-## 9. Reste à faire
+## 9. Mise en ligne (production)
+
+En développement, le site (port 5173) et l'API (port 4000) sont deux serveurs séparés,
+reliés par le proxy de Vite (`client/vite.config.js`).
+
+En production, **un seul serveur suffit** : Express sert à la fois l'API et le site React.
+
+```bash
+npm start
+```
+
+Cette commande construit le site (`client/dist`) puis démarre le serveur. Tout est
+alors accessible sur **http://localhost:4000** — le site *et* l'API. Plus de proxy,
+plus de CORS, un seul port à ouvrir.
+
+Le serveur détecte tout seul la présence du dossier `client/dist` : s'il existe, il le
+sert et renvoie `index.html` pour toutes les adresses gérées par React (`/connexion`,
+`/universites/ucad`…) ; les adresses commençant par `/api` restent réservées à l'API.
+
+**Avant de déployer sur un vrai hébergeur :**
+
+| À faire | Où |
+|---|---|
+| Remplacer `JWT_SECRET` par une longue chaîne aléatoire | `server/.env` |
+| Mettre `NODE_ENV=production` | `server/.env` |
+| Renseigner les identifiants MySQL de l'hébergeur | `server/.env` → `DATABASE_URL` |
+| Activer l'envoi d'e-mails (`MAIL_ENABLED=true` + SMTP) | `server/.env` |
+| Servir le site en **HTTPS** | configuration de l'hébergeur |
+| Créer les tables sur le serveur distant | `npm run prisma:push -w server` |
+
+**Cas particulier — site et API hébergés séparément** (par exemple le site sur Netlify
+et l'API sur Render) : créez un fichier `client/.env` à partir de `client/.env.example`
+et renseignez l'adresse complète de l'API :
+
+```
+VITE_API_URL="https://mon-api.exemple.com/api"
+```
+
+Pensez alors à mettre `CLIENT_URL` dans `server/.env` à l'adresse du site, sinon CORS
+bloquera les appels.
+
+## 10. Reste à faire
 
 - **Transport (Binta)** : filtres par mode, fiches détaillées, carte interactive, annuaire des prestataires.
 - **Activités (Maguette)** : filtres agenda, détail d'un événement, formulaire de proposition, recommandations.

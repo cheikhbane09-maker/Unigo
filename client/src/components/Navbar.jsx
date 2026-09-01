@@ -1,192 +1,101 @@
-import { useState } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext.jsx';
-import { useI18n } from '../i18n/I18nContext.jsx';
-import { useCompare } from '../context/CompareContext.jsx';
-import GlobalSearch from './GlobalSearch.jsx';
-import { IconCap, IconMenu, IconX, IconHeart, IconScale, IconUser, IconShield, IconLogout } from './Icons.jsx';
+/* ===================================================================
+ * BARRE DE NAVIGATION
+ * -------------------------------------------------------------------
+ * NavLink est comme un lien classique, mais il sait s'il est actif :
+ * on s'en sert pour colorer l'onglet de la page en cours.
+ * useState sert à ouvrir/fermer le menu sur téléphone.
+ * =================================================================== */
 
-function LanguageSwitcher() {
-  const { locale, setLocale, languages } = useI18n();
-  return (
-    <div className="inline-flex rounded-lg bg-ink-100 p-0.5" role="group" aria-label="Langue">
-      {languages.map((l) => (
-        <button
-          key={l.code}
-          type="button"
-          onClick={() => setLocale(l.code)}
-          aria-pressed={locale === l.code}
-          className={`rounded-md px-2 py-1 text-xs font-semibold transition ${
-            locale === l.code ? 'bg-white text-brand-700 shadow-sm' : 'text-ink-600 hover:text-ink-800'
-          }`}
-        >
-          {l.code.toUpperCase()}
-        </button>
-      ))}
-    </div>
-  );
-}
+import { useState } from 'react';
+import { Link, NavLink } from 'react-router-dom';
+
+// Les onglets du menu. Pour en ajouter un, il suffit d'ajouter une ligne.
+const liens = [
+  { chemin: '/universites', libelle: 'Universités' },
+  { chemin: '/transport', libelle: 'Transport' },
+  { chemin: '/activites', libelle: 'Activités' },
+];
 
 export default function Navbar() {
-  const { t } = useI18n();
-  const { user, isAuthenticated, isAdmin, logout } = useAuth();
-  const { ids } = useCompare();
-  const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
+  const [menuOuvert, setMenuOuvert] = useState(false);
 
-  const links = [
-    { to: '/universites', label: t('nav.universities') },
-    { to: '/demarches', label: t('nav.procedures') },
-    { to: '/temoignages', label: t('nav.testimonials') },
-    { to: '/transport', label: t('nav.transport') },
-    { to: '/activites', label: t('nav.activities') },
-  ];
-
-  const linkClass = ({ isActive }) =>
+  // Cette fonction reçoit { isActive } de la part de NavLink.
+  const classeLien = ({ isActive }) =>
     `rounded-lg px-3 py-2 text-sm font-medium transition ${
-      isActive ? 'bg-brand-50 text-brand-700' : 'text-ink-600 hover:bg-ink-100 hover:text-ink-800'
+      isActive
+        ? 'bg-brand-50 text-brand-700'
+        : 'text-ardoise-600 hover:bg-ardoise-100 hover:text-ardoise-900'
     }`;
 
-  const handleLogout = () => {
-    logout();
-    setOpen(false);
-    navigate('/');
-  };
-
   return (
-    <header className="sticky top-0 z-40 border-b border-ink-100 bg-white/85 backdrop-blur">
-      <div className="container-page">
-        <div className="flex h-16 items-center gap-3">
-          <Link to="/" className="flex shrink-0 items-center gap-2" aria-label="UNIGO — accueil">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand-700 text-white">
-              <IconCap size={20} />
-            </span>
-            <span className="font-display text-lg font-extrabold tracking-tight text-ink-900">
-              UNI<span className="text-brand-600">GO</span>
-            </span>
-          </Link>
+    <header className="sticky top-0 z-40 border-b border-ardoise-100 bg-white/90 backdrop-blur">
+      <div className="conteneur flex h-16 items-center gap-4">
+        {/* Logo */}
+        <Link to="/" className="flex shrink-0 items-center gap-2">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand-700 text-lg font-bold text-white">
+            U
+          </span>
+          <span className="text-lg font-extrabold tracking-tight text-ardoise-900">
+            UNI<span className="text-brand-600">GO</span>
+          </span>
+        </Link>
 
-          <nav className="ml-2 hidden items-center gap-1 lg:flex">
-            {links.map((l) => (
-              <NavLink key={l.to} to={l.to} className={linkClass}>
-                {l.label}
+        {/* Menu — masqué sur téléphone (hidden md:flex) */}
+        <nav className="ml-4 hidden items-center gap-1 md:flex">
+          {liens.map((lien) => (
+            <NavLink key={lien.chemin} to={lien.chemin} className={classeLien}>
+              {lien.libelle}
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* Boutons de compte, à droite */}
+        <div className="ml-auto hidden items-center gap-2 md:flex">
+          <Link to="/connexion" className="bouton-secondaire">
+            Connexion
+          </Link>
+          <Link to="/inscription" className="bouton-principal">
+            S'inscrire
+          </Link>
+        </div>
+
+        {/* Bouton hamburger — visible uniquement sur téléphone */}
+        <button
+          type="button"
+          onClick={() => setMenuOuvert(!menuOuvert)}
+          className="ml-auto rounded-lg p-2 text-ardoise-600 hover:bg-ardoise-100 md:hidden"
+          aria-label="Ouvrir le menu"
+          aria-expanded={menuOuvert}
+        >
+          {menuOuvert ? '✕' : '☰'}
+        </button>
+      </div>
+
+      {/* Menu déroulant sur téléphone */}
+      {menuOuvert && (
+        <div className="conteneur border-t border-ardoise-100 py-4 md:hidden">
+          <nav className="flex flex-col gap-1">
+            {liens.map((lien) => (
+              <NavLink
+                key={lien.chemin}
+                to={lien.chemin}
+                className={classeLien}
+                onClick={() => setMenuOuvert(false)}
+              >
+                {lien.libelle}
               </NavLink>
             ))}
           </nav>
-
-          <div className="ml-auto hidden w-64 xl:block">
-            <GlobalSearch />
-          </div>
-
-          <div className="ml-auto flex items-center gap-2 lg:ml-3">
-            <div className="hidden sm:block">
-              <LanguageSwitcher />
-            </div>
-
-            <Link
-              to="/comparateur"
-              className="relative hidden rounded-lg p-2 text-ink-600 hover:bg-ink-100 sm:block"
-              aria-label={t('nav.compare')}
-              title={t('nav.compare')}
-            >
-              <IconScale size={20} />
-              {ids.length > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-sand-500 px-1 text-[10px] font-bold text-white">
-                  {ids.length}
-                </span>
-              )}
+          <div className="mt-4 flex gap-2 border-t border-ardoise-100 pt-4">
+            <Link to="/connexion" className="bouton-secondaire" onClick={() => setMenuOuvert(false)}>
+              Connexion
             </Link>
-
-            {isAuthenticated ? (
-              <div className="hidden items-center gap-1 lg:flex">
-                <Link to="/favoris" className="rounded-lg p-2 text-ink-600 hover:bg-ink-100" title={t('nav.favorites')}>
-                  <IconHeart size={20} />
-                </Link>
-                {isAdmin && (
-                  <Link to="/admin" className="rounded-lg p-2 text-ink-600 hover:bg-ink-100" title={t('nav.admin')}>
-                    <IconShield size={20} />
-                  </Link>
-                )}
-                <Link to="/profil" className="btn-secondary !px-3">
-                  <IconUser size={18} />
-                  <span className="max-w-[9rem] truncate">{user.fullName.split(' ')[0]}</span>
-                </Link>
-                <button type="button" onClick={handleLogout} className="btn-ghost !px-2" title={t('nav.logout')}>
-                  <IconLogout size={18} />
-                </button>
-              </div>
-            ) : (
-              <div className="hidden items-center gap-2 lg:flex">
-                <Link to="/connexion" className="btn-ghost">
-                  {t('nav.login')}
-                </Link>
-                <Link to="/inscription" className="btn-primary">
-                  {t('nav.register')}
-                </Link>
-              </div>
-            )}
-
-            <button
-              type="button"
-              className="rounded-lg p-2 text-ink-600 hover:bg-ink-100 lg:hidden"
-              onClick={() => setOpen((v) => !v)}
-              aria-expanded={open}
-              aria-label={t('nav.menu')}
-            >
-              {open ? <IconX size={22} /> : <IconMenu size={22} />}
-            </button>
+            <Link to="/inscription" className="bouton-principal" onClick={() => setMenuOuvert(false)}>
+              S'inscrire
+            </Link>
           </div>
         </div>
-
-        {open && (
-          <div className="border-t border-ink-100 py-4 lg:hidden">
-            <div className="mb-3">
-              <GlobalSearch />
-            </div>
-            <nav className="flex flex-col gap-1">
-              {links.map((l) => (
-                <NavLink key={l.to} to={l.to} className={linkClass} onClick={() => setOpen(false)}>
-                  {l.label}
-                </NavLink>
-              ))}
-              <NavLink to="/comparateur" className={linkClass} onClick={() => setOpen(false)}>
-                {t('nav.compare')} {ids.length > 0 && `(${ids.length})`}
-              </NavLink>
-            </nav>
-
-            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-ink-100 pt-4">
-              <LanguageSwitcher />
-              {isAuthenticated ? (
-                <>
-                  <Link to="/favoris" className="btn-secondary" onClick={() => setOpen(false)}>
-                    {t('nav.favorites')}
-                  </Link>
-                  <Link to="/profil" className="btn-secondary" onClick={() => setOpen(false)}>
-                    {t('nav.profile')}
-                  </Link>
-                  {isAdmin && (
-                    <Link to="/admin" className="btn-secondary" onClick={() => setOpen(false)}>
-                      {t('nav.admin')}
-                    </Link>
-                  )}
-                  <button type="button" onClick={handleLogout} className="btn-ghost">
-                    {t('nav.logout')}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link to="/connexion" className="btn-secondary" onClick={() => setOpen(false)}>
-                    {t('nav.login')}
-                  </Link>
-                  <Link to="/inscription" className="btn-primary" onClick={() => setOpen(false)}>
-                    {t('nav.register')}
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+      )}
     </header>
   );
 }
