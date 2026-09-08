@@ -4,13 +4,16 @@
  * Chaque route suit toujours le même plan :
  *   1. on récupère ce que le formulaire a envoyé (req.body)
  *   2. on vérifie que c'est correct        → sinon res.status(400)
- *   3. on lit ou on modifie la base
+ *   3. on interroge ou on modifie MySQL
  *   4. on renvoie une réponse en JSON      → res.json(...)
+ *
+ * ⚠ Les requêtes SQL utilisent des « ? » : c'est mysql2 qui insère
+ * les valeurs, jamais nous. C'est ce qui protège de l'injection SQL.
  * =================================================================== */
 
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import { lireBase, ecrireBase } from '../base.js';
+import { pool } from '../base.js';
 import { fabriquerJeton, utilisateurPublic, exigeConnexion } from '../auth.js';
 
 const router = Router();
@@ -52,10 +55,12 @@ router.post('/inscription', async (req, res) => {
     }
 
     const emailPropre = email.toLowerCase().trim();
-    const base = lireBase();
 
     // 2. Le compte existe-t-il déjà ?
-    if (base.utilisateurs.some((u) => u.email === emailPropre)) {
+    const [existants] = await pool.query('SELECT id FROM utilisateurs WHERE email = ?', [
+      emailPropre,
+    ]);
+    if (existants.length > 0) {
       return res.status(409).json({ error: 'Cette adresse e-mail est déjà utilisée.' });
     }
 
@@ -63,23 +68,21 @@ router.post('/inscription', async (req, res) => {
     //    bcrypt le transforme en empreinte impossible à inverser.
     const motDePasseHache = await bcrypt.hash(motDePasse, 10);
 
-    const nouvelUtilisateur = {
-      id: Date.now(), // identifiant unique simple
-      nomComplet: nomComplet.trim(),
-      email: emailPropre,
-      motDePasseHache,
-      pays: pays || '',
-      domaine: domaine || '',
-      inscritLe: new Date().toISOString(),
-    };
+    const [resultat] = await pool.query(
+      `INSERT INTO utilisateurs (nomComplet, email, motDePasseHache, pays, domaine)
+       VALUES (?,?,?,?,?)`,
+      [nomComplet.trim(), emailPropre, motDePasseHache, pays || '', domaine || '']
+    );
 
-    base.utilisateurs.push(nouvelUtilisateur);
-    ecrireBase(base);
+    // 4. On relit la ligne créée pour renvoyer le profil complet.
+    const [lignes] = await pool.query('SELECT * FROM utilisateurs WHERE id = ?', [
+      resultat.insertId,
+    ]);
+    const utilisateur = lignes[0];
 
-    // 4. On connecte directement la personne.
     res.status(201).json({
-      jeton: fabriquerJeton(nouvelUtilisateur),
-      utilisateur: utilisateurPublic(nouvelUtilisateur),
+      jeton: fabriquerJeton(utilisateur),
+      utilisateur: utilisateurPublic(utilisateur),
     });
   } catch (erreur) {
     console.error('Erreur inscription :', erreur);
@@ -99,8 +102,10 @@ router.post('/connexion', async (req, res) => {
       return res.status(400).json({ error: 'E-mail et mot de passe sont obligatoires.' });
     }
 
-    const emailPropre = email.toLowerCase().trim();
-    const utilisateur = lireBase().utilisateurs.find((u) => u.email === emailPropre);
+    const [lignes] = await pool.query('SELECT * FROM utilisateurs WHERE email = ?', [
+      email.toLowerCase().trim(),
+    ]);
+    const utilisateur = lignes[0];
 
     // bcrypt.compare re-hache ce qui est saisi et compare les empreintes.
     // On ne peut jamais retrouver le mot de passe d'origine.
@@ -146,15 +151,17 @@ router.post('/nouveau-mot-de-passe', async (req, res) => {
     if (probleme) return res.status(400).json({ error: probleme });
 
     const emailPropre = String(email || '').toLowerCase().trim();
-    const base = lireBase();
-    const utilisateur = base.utilisateurs.find((u) => u.email === emailPropre);
 
-    if (!utilisateur) {
+    const [lignes] = await pool.query('SELECT id FROM utilisateurs WHERE email = ?', [emailPropre]);
+    if (lignes.length === 0) {
       return res.status(404).json({ error: "Aucun compte n'existe avec cette adresse." });
     }
 
-    utilisateur.motDePasseHache = await bcrypt.hash(motDePasse, 10);
-    ecrireBase(base);
+    const motDePasseHache = await bcrypt.hash(motDePasse, 10);
+    await pool.query('UPDATE utilisateurs SET motDePasseHache = ? WHERE id = ?', [
+      motDePasseHache,
+      lignes[0].id,
+    ]);
 
     res.json({ message: 'Mot de passe modifié. Vous pouvez vous connecter.' });
   } catch (erreur) {

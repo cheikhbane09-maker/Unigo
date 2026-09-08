@@ -3,15 +3,16 @@
  * -------------------------------------------------------------------
  * Lancé par « npm run dev:server » depuis la racine du projet.
  *
- * Rien à installer : pas de MySQL, pas de XAMPP. Les données sont
- * dans le fichier server/donnees.json, créé automatiquement au
- * premier démarrage.
+ * ⚠ MySQL doit tourner AVANT de lancer ce serveur :
+ *   ouvre le XAMPP Control Panel et clique sur Start en face de MySQL.
+ *   La base « unigo » et ses tables sont créées automatiquement.
  * =================================================================== */
 
+import 'dotenv/config'; // charge server/.env
 import express from 'express';
 import cors from 'cors';
 
-import { lireBase } from './base.js';
+import { initialiserBase, pool } from './base.js';
 import authRoutes from './routes/auth.routes.js';
 import contenuRoutes from './routes/contenu.routes.js';
 
@@ -34,9 +35,9 @@ app.use((req, _res, suite) => {
 
 /* ------------------------------- Routes ------------------------------- */
 
-// Adresse de test : ouvrez http://localhost:4000/api/sante
+// Adresse de test : ouvre http://localhost:4000/api/sante
 app.get('/api/sante', (_req, res) => {
-  res.json({ statut: 'ok', service: 'API UNIGO' });
+  res.json({ statut: 'ok', service: 'API UNIGO', base: 'MySQL' });
 });
 
 app.use('/api/auth', authRoutes); // inscription, connexion, mot de passe
@@ -49,18 +50,40 @@ app.use((_req, res) => {
 
 /* ------------------------------ Démarrage ----------------------------- */
 
-// On lit la base une fois au démarrage : ça crée le fichier s'il manque
-// et ça permet d'afficher un petit résumé.
-const base = lireBase();
+// On attend que la base soit prête AVANT d'ouvrir le serveur : sinon les
+// premières requêtes arriveraient sur des tables qui n'existent pas encore.
+try {
+  const nomBase = await initialiserBase();
 
-app.listen(PORT, () => {
-  console.log('\n  ════════════════════════════════════════');
-  console.log(`   API UNIGO démarrée sur http://localhost:${PORT}`);
-  console.log('  ════════════════════════════════════════');
-  console.log(`   ${base.universites.length} établissements`);
-  console.log(`   ${base.moyensTransport.length} moyens de transport`);
-  console.log(`   ${base.categoriesActivites.length} familles d'activités`);
-  console.log(`   ${base.utilisateurs.length} compte(s) inscrit(s)`);
-  console.log('\n   Test : http://localhost:4000/api/sante');
-  console.log('   Site React attendu sur http://localhost:5173\n');
-});
+  const [[u]] = await pool.query('SELECT COUNT(*) AS n FROM universites');
+  const [[t]] = await pool.query('SELECT COUNT(*) AS n FROM transports');
+  const [[a]] = await pool.query('SELECT COUNT(*) AS n FROM activites');
+  const [[c]] = await pool.query('SELECT COUNT(*) AS n FROM utilisateurs');
+
+  app.listen(PORT, () => {
+    console.log('\n  ════════════════════════════════════════');
+    console.log(`   API UNIGO démarrée sur http://localhost:${PORT}`);
+    console.log('  ════════════════════════════════════════');
+    console.log(`   Base MySQL « ${nomBase} » connectée`);
+    console.log(`   ${u.n} établissements · ${t.n} transports · ${a.n} familles d'activités`);
+    console.log(`   ${c.n} compte(s) inscrit(s)`);
+    console.log('\n   Test  : http://localhost:4000/api/sante');
+    console.log('   Base  : http://localhost/phpmyadmin');
+    console.log('   Site  : http://localhost:5173\n');
+  });
+} catch (erreur) {
+  // Le message le plus utile du projet : sans ça, on cherche pendant une heure.
+  console.error('\n  ✖ IMPOSSIBLE DE SE CONNECTER À MYSQL\n');
+
+  if (erreur.code === 'ECONNREFUSED') {
+    console.error('   MySQL ne tourne pas.');
+    console.error('   → Ouvre le XAMPP Control Panel et clique sur Start en face de MySQL.\n');
+  } else if (erreur.code === 'ER_ACCESS_DENIED_ERROR') {
+    console.error("   Identifiants refusés par MySQL.");
+    console.error('   → Vérifie DB_USER et DB_PASSWORD dans server/.env\n');
+  } else {
+    console.error(`   ${erreur.message}\n`);
+  }
+
+  process.exit(1);
+}

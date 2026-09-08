@@ -3,7 +3,7 @@
 Projet développé d'après le cahier des charges *« Conception et développement d'une plateforme web
 dédiée aux étudiants étrangers au Sénégal — Université · Transport · Activités & Divertissement »*.
 
-**Stack :** React 18 + Vite + Tailwind CSS · Node.js + Express · JWT + bcrypt
+**Stack :** React 18 + Vite + Tailwind CSS · Node.js + Express · **MySQL (XAMPP)** · JWT + bcrypt
 
 | Membre | Module | Branche Git |
 |---|---|---|
@@ -13,16 +13,37 @@ dédiée aux étudiants étrangers au Sénégal — Université · Transport · 
 
 ---
 
-## 1. Lancer le projet (2 commandes)
+## 1. Lancer le projet
 
-**Rien à installer d'autre que Node.js.** Pas de MySQL, pas de XAMPP, pas de base de données à créer.
+### Étape 1 — Démarrer MySQL dans XAMPP
+
+Ouvre le **XAMPP Control Panel** et clique sur **Start** en face de **MySQL**.
+La ligne doit devenir verte. (Apache n'est pas nécessaire.)
+
+> C'est la seule étape à ne pas oublier. Sans MySQL démarré, le serveur affiche
+> `✖ IMPOSSIBLE DE SE CONNECTER À MYSQL` et s'arrête.
+
+### Étape 2 — Le fichier de réglages
+
+Une seule fois, copie `server/.env.example` en `server/.env` :
+
+```bash
+copy server\.env.example server\.env
+```
+
+Les valeurs par défaut sont déjà celles de XAMPP (`root`, sans mot de passe, port 3306).
+
+### Étape 3 — Lancer
 
 ```bash
 npm install
 npm run dev
 ```
 
-C'est tout. Deux serveurs démarrent en même temps :
+**La base `unigo` et ses 4 tables sont créées automatiquement au premier démarrage**,
+puis remplies avec le contenu de `server/src/donnees.js`. Rien à faire dans phpMyAdmin.
+
+Deux serveurs démarrent en même temps :
 
 | | Adresse | Rôle |
 |---|---|---|
@@ -47,21 +68,26 @@ Le site est fermé — sans compte, on ne voit que la page d'accueil.
 
 ## 2. Où sont les données
 
-Dans **`server/donnees.json`**, un simple fichier créé automatiquement au premier démarrage.
-Tu peux l'ouvrir dans VS Code pour voir ce qu'il contient.
+Dans la base MySQL **`unigo`**, que tu peux ouvrir dans **phpMyAdmin** :
+http://localhost/phpmyadmin
+
+| Table | Contenu |
+|---|---|
+| `utilisateurs` | Les comptes (mot de passe **haché**, jamais en clair) |
+| `universites` | Les 9 établissements |
+| `transports` | Les 5 moyens de transport |
+| `activites` | Les 4 familles d'activités |
 
 - Pour **modifier le contenu du site** (universités, transports, activités) :
-  édite **`server/src/donnees.js`**, supprime `server/donnees.json`, relance le serveur.
-- Pour **repartir de zéro** (effacer tous les comptes) : supprime `server/donnees.json`.
+  édite **`server/src/donnees.js`**, puis supprime la base dans phpMyAdmin
+  (onglet *Opérations* → *Supprimer la base*) et relance le serveur : elle est recréée.
+- Pour **repartir de zéro** (effacer tous les comptes) : même chose.
 
-> Attention aux deux noms qui se ressemblent :
-> `server/src/donnees.js` = le contenu que **tu écris** · `server/donnees.json` = la base **générée**.
+> `server/src/donnees.js` = le contenu de départ que **tu écris**.
+> Il ne sert qu'au premier remplissage : ensuite, c'est MySQL qui fait foi.
 
-`donnees.json` n'est pas envoyé sur GitHub (il contient les comptes des utilisateurs).
-
-> Un fichier JSON suffit largement pour ce projet. Pour un vrai site avec beaucoup de
-> visiteurs, on passerait à MySQL ou PostgreSQL : seul `server/src/base.js` serait à
-> réécrire, les routes ne changeraient pas d'une ligne.
+Le fichier `server/.env` (réglages de connexion) n'est **pas** envoyé sur GitHub.
+C'est pour ça qu'il faut le recréer à partir de `.env.example` sur chaque machine.
 
 ---
 
@@ -70,12 +96,13 @@ Tu peux l'ouvrir dans VS Code pour voir ce qu'il contient.
 ```
 UNIGO/
 ├─ server/                      → l'API (Node.js + Express)
-│  ├─ donnees.json              → la base de données (créée toute seule)
+│  ├─ .env                      → réglages MySQL (à créer depuis .env.example)
+│  ├─ .env.example              → le modèle, avec les réglages XAMPP
 │  └─ src/
 │     ├─ index.js               → point d'entrée, branche les routes
-│     ├─ base.js                → lire / écrire donnees.json
+│     ├─ base.js                → connexion MySQL, création des tables
 │     ├─ auth.js                → jetons JWT et protection des routes
-│     ├─ donnees.js            → LE CONTENU DU SITE (à modifier ici)
+│     ├─ donnees.js             → LE CONTENU DE DÉPART (à modifier ici)
 │     └─ routes/
 │        ├─ auth.routes.js      → inscription, connexion, mot de passe
 │        └─ contenu.routes.js   → universités, transport, activités
@@ -115,7 +142,10 @@ C'est normal, c'est justement le but. Le site, lui, l'envoie automatiquement.
 ## 5. La sécurité
 
 - **Mots de passe hachés avec bcrypt.** Le mot de passe n'est jamais stocké : on garde
-  une empreinte impossible à inverser. Ouvre `server/donnees.json` pour le vérifier.
+  une empreinte impossible à inverser. Ouvre la table `utilisateurs` dans phpMyAdmin
+  pour le vérifier — la colonne `motDePasseHache` ressemble à `$2a$10$wFm.ce90…`.
+- **Requêtes préparées** (les `?` dans le SQL) : c'est ce qui protège de l'**injection SQL**.
+  On ne colle jamais une valeur venue du navigateur directement dans une requête.
 - **Jeton JWT signé**, valable 7 jours. Le navigateur le range et le renvoie à chaque appel.
 - **Double protection des pages** : React empêche d'afficher la page sans compte
   (`RouteProtegee.jsx`), et l'API refuse de renvoyer les données sans jeton
@@ -126,9 +156,9 @@ C'est normal, c'est justement le but. Le site, lui, l'envoie automatiquement.
 - **Vérification de toutes les données reçues** côté serveur : on ne fait jamais confiance
   à ce qui vient du navigateur.
 
-> Avant une vraie mise en ligne : servir le site en HTTPS et remplacer la clé
-> `JWT_SECRET` (dans `server/src/auth.js`) par une longue chaîne aléatoire
-> rangée dans un fichier `.env`.
+> Avant une vraie mise en ligne : servir le site en HTTPS, remplacer `JWT_SECRET`
+> dans `server/.env` par une longue chaîne aléatoire, et créer un utilisateur MySQL
+> dédié avec un mot de passe (plutôt que `root` sans mot de passe, réservé au local).
 
 ---
 
@@ -139,16 +169,19 @@ Tout est écrit sur le même modèle. Une fois qu'on a compris une route, on les
 **Une route de l'API :**
 
 ```js
-router.get('/mon-adresse', exigeConnexion, (req, res) => {
+router.get('/mon-adresse', exigeConnexion, async (req, res) => {
   try {
-    const donnees = lireBase().maListe;   // 1. on lit la base
-    res.json({ data: donnees });          // 2. on renvoie du JSON
+    const [lignes] = await pool.query('SELECT * FROM ma_table WHERE id = ?', [req.params.id]);
+    res.json({ data: lignes });           // on renvoie du JSON
   } catch (erreur) {
     console.error(erreur);
     res.status(500).json({ error: 'Message affiché à l\'utilisateur.' });
   }
 });
 ```
+
+Trois choses à retenir : `async` + `await` (MySQL répond avec un petit délai),
+le `?` (jamais de valeur collée dans le SQL), et le `try / catch`.
 
 **Une page React qui charge des données :**
 
@@ -169,7 +202,19 @@ d'erreur est dans le **terminal de l'API**, pas dans le navigateur.
 
 ---
 
-## 7. Travail en équipe
+## 7. Problèmes fréquents
+
+| Message | Ce que ça veut dire | Solution |
+|---|---|---|
+| `✖ IMPOSSIBLE DE SE CONNECTER À MYSQL` + `ECONNREFUSED` | MySQL n'est pas démarré | XAMPP → **Start** en face de MySQL |
+| `ER_ACCESS_DENIED_ERROR` | Mauvais identifiants | Vérifie `DB_USER` / `DB_PASSWORD` dans `server/.env` |
+| `EADDRINUSE :::4000` | Un serveur tourne déjà | `npx kill-port 4000` |
+| `Cannot find module 'mysql2'` | Dépendances pas installées | `npm install` à la racine |
+| Le site dit « Le serveur ne répond pas » | L'API est arrêtée | Relance `npm run dev` |
+
+---
+
+## 8. Travail en équipe
 
 Chacun travaille sur sa branche, puis ouvre une pull request vers `main`.
 La marche à suivre complète est dans **GUIDE_UNIGO_VSCODE.docx**.
@@ -184,7 +229,7 @@ git push
 
 ---
 
-## 8. Reste à faire
+## 9. Reste à faire
 
 - **Transport (Binta)** : trajets fréquents (aéroport ↔ campus), filtres, carte interactive
 - **Activités (Maguette)** : vrais lieux avec adresse et téléphone, agenda des événements

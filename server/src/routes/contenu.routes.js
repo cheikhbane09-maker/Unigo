@@ -10,55 +10,65 @@
  *
  * La deuxième est la vraie : on peut contourner React en tapant
  * l'adresse de l'API à la main, jamais le contrôle du serveur.
+ *
+ * ⚠ Toutes les requêtes SQL utilisent des « ? » remplacés par
+ * mysql2. C'est ce qui protège de l'injection SQL : on ne colle
+ * JAMAIS une valeur venue du navigateur directement dans la requête.
  * =================================================================== */
 
 import { Router } from 'express';
-import { lireBase } from '../base.js';
+import { pool, universiteDepuisBase, activiteDepuisBase } from '../base.js';
 import { exigeConnexion } from '../auth.js';
 
 const router = Router();
 
 /* -------------------------------------------------------------------
  * GET /api/statistiques — PUBLIQUE (pas de exigeConnexion)
- * Sert les trois chiffres affiches sur la page d'accueil. On ne
- * renvoie que des nombres : aucune donnee sensible ne fuit.
+ * Les trois chiffres de la page d'accueil. On ne renvoie que des
+ * nombres : aucune donnée sensible ne fuit.
  * ----------------------------------------------------------------- */
-router.get('/statistiques', (_req, res) => {
+router.get('/statistiques', async (_req, res) => {
   try {
-    const base = lireBase();
-    res.json({
-      data: {
-        universites: base.universites.length,
-        transports: base.moyensTransport.length,
-        activites: base.categoriesActivites.reduce(
-          (total, c) => total + c.sousCategories.length,
-          0
-        ),
-      },
-    });
+    const [[universites]] = await pool.query('SELECT COUNT(*) AS n FROM universites');
+    const [[transports]] = await pool.query('SELECT COUNT(*) AS n FROM transports');
+    const [lignes] = await pool.query('SELECT sousCategories FROM activites');
+
+    // On additionne le nombre de sous-catégories de chaque famille.
+    const activites = lignes.reduce(
+      (total, l) => total + JSON.parse(l.sousCategories || '[]').length,
+      0
+    );
+
+    res.json({ data: { universites: universites.n, transports: transports.n, activites } });
   } catch (erreur) {
     console.error('Erreur statistiques :', erreur);
     res.status(500).json({ error: 'Impossible de charger les statistiques.' });
   }
 });
 
-/* GET /api/universites — l'annuaire complet, avec recherche facultative */
-router.get('/universites', exigeConnexion, (req, res) => {
+/* GET /api/universites — l'annuaire, avec recherche et filtre facultatifs */
+router.get('/universites', exigeConnexion, async (req, res) => {
   try {
-    let universites = lireBase().universites;
+    let requete = 'SELECT * FROM universites';
+    const valeurs = [];
 
-    // ?recherche=cesag  → filtre sur le nom, le quartier, la description
-    const recherche = String(req.query.recherche || '').toLowerCase().trim();
+    // ?recherche=cesag → cherche dans le nom, le quartier, la description
+    const recherche = String(req.query.recherche || '').trim();
     if (recherche) {
-      universites = universites.filter((u) =>
-        `${u.nom} ${u.nomComplet} ${u.quartier} ${u.description}`.toLowerCase().includes(recherche)
-      );
+      requete += ` WHERE (nom LIKE ? OR nomComplet LIKE ? OR quartier LIKE ? OR description LIKE ?)`;
+      const motif = `%${recherche}%`;
+      valeurs.push(motif, motif, motif, motif);
     }
 
-    // ?domaine=Informatique
-    const domaine = req.query.domaine;
-    if (domaine) {
-      universites = universites.filter((u) => u.domaines.includes(domaine));
+    requete += ' ORDER BY nom';
+
+    const [lignes] = await pool.query(requete, valeurs);
+    let universites = lignes.map(universiteDepuisBase);
+
+    // ?domaine=Informatique — filtré en JavaScript, car les domaines
+    // sont enregistrés sous forme de liste JSON dans une colonne texte.
+    if (req.query.domaine) {
+      universites = universites.filter((u) => u.domaines.includes(req.query.domaine));
     }
 
     res.json({ data: universites });
@@ -69,15 +79,15 @@ router.get('/universites', exigeConnexion, (req, res) => {
 });
 
 /* GET /api/universites/cesag — la fiche d'un établissement */
-router.get('/universites/:id', exigeConnexion, (req, res) => {
+router.get('/universites/:id', exigeConnexion, async (req, res) => {
   try {
-    const universite = lireBase().universites.find((u) => u.id === req.params.id);
+    const [lignes] = await pool.query('SELECT * FROM universites WHERE id = ?', [req.params.id]);
 
-    if (!universite) {
+    if (lignes.length === 0) {
       return res.status(404).json({ error: 'Établissement introuvable.' });
     }
 
-    res.json({ data: universite });
+    res.json({ data: universiteDepuisBase(lignes[0]) });
   } catch (erreur) {
     console.error('Erreur fiche universite :', erreur);
     res.status(500).json({ error: 'Impossible de charger la fiche.' });
@@ -85,9 +95,10 @@ router.get('/universites/:id', exigeConnexion, (req, res) => {
 });
 
 /* GET /api/transport — module de Binta */
-router.get('/transport', exigeConnexion, (req, res) => {
+router.get('/transport', exigeConnexion, async (_req, res) => {
   try {
-    res.json({ data: lireBase().moyensTransport });
+    const [lignes] = await pool.query('SELECT * FROM transports ORDER BY prixMin');
+    res.json({ data: lignes });
   } catch (erreur) {
     console.error('Erreur transport :', erreur);
     res.status(500).json({ error: 'Impossible de charger les transports.' });
@@ -95,9 +106,10 @@ router.get('/transport', exigeConnexion, (req, res) => {
 });
 
 /* GET /api/activites — module de Maguette */
-router.get('/activites', exigeConnexion, (req, res) => {
+router.get('/activites', exigeConnexion, async (_req, res) => {
   try {
-    res.json({ data: lireBase().categoriesActivites });
+    const [lignes] = await pool.query('SELECT * FROM activites ORDER BY ordre');
+    res.json({ data: lignes.map(activiteDepuisBase) });
   } catch (erreur) {
     console.error('Erreur activites :', erreur);
     res.status(500).json({ error: 'Impossible de charger les activités.' });
