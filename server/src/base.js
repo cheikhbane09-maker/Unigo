@@ -14,6 +14,7 @@
 
 import mysql from 'mysql2/promise';
 import { donneesInitiales } from './donnees.js';
+import { lieux } from './donnees-activites.js'; // module Activités (Maguette)
 
 const reglages = {
   host: process.env.DB_HOST || 'localhost',
@@ -104,19 +105,43 @@ export async function initialiserBase() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
-  // 4. Remplissage initial, seulement si les tables sont vides.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS lieux (
+      id            VARCHAR(60) PRIMARY KEY,
+      nom           VARCHAR(160) NOT NULL,
+      categorie     VARCHAR(60),
+      sousCategorie VARCHAR(120),
+      ville         VARCHAR(80),
+      telephone     VARCHAR(40),
+      siteWeb       VARCHAR(255),
+      carte         VARCHAR(255),
+      aVerifier     BOOLEAN DEFAULT FALSE,
+      ordre         INT DEFAULT 0
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  // 4. Remplissage initial, table par table (seulement si elle est vide).
   await remplirSiVide();
 
   return reglages.database;
 }
 
-/* Remplit les tables de contenu à partir de src/donnees.js. */
+/* Combien de lignes dans une table ? Sert à ne remplir que les tables vides. */
+async function estVide(table) {
+  const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM \`${table}\``);
+  return total === 0;
+}
+
+/* Remplit les tables de contenu à partir des fichiers src/donnees*.js. */
 async function remplirSiVide() {
-  const [[{ total }]] = await pool.query('SELECT COUNT(*) AS total FROM universites');
-  if (total > 0) return; // déjà rempli, on ne touche à rien
+  if (await estVide('universites')) await remplirUniversites();
+  if (await estVide('transports')) await remplirTransports();
+  if (await estVide('activites')) await remplirActivites();
+  if (await estVide('lieux')) await remplirLieux();
+}
 
-  console.log('  → Premier démarrage : remplissage des tables…');
-
+async function remplirUniversites() {
+  console.log('  → Remplissage des établissements…');
   for (const u of donneesInitiales.universites) {
     await pool.query(
       `INSERT INTO universites
@@ -133,7 +158,10 @@ async function remplirSiVide() {
       ]
     );
   }
+}
 
+async function remplirTransports() {
+  console.log('  → Remplissage des transports…');
   for (const t of donneesInitiales.moyensTransport) {
     await pool.query(
       `INSERT INTO transports (id, nom, prixMin, prixMax, description, conseil)
@@ -141,7 +169,10 @@ async function remplirSiVide() {
       [t.id, t.nom, t.prixMin, t.prixMax, t.description, t.conseil]
     );
   }
+}
 
+async function remplirActivites() {
+  console.log("  → Remplissage des familles d'activités…");
   // « ordre » conserve l'ordre d'affichage voulu : sans lui, MySQL
   // renverrait les familles dans n'importe quel ordre.
   let position = 0;
@@ -153,8 +184,26 @@ async function remplirSiVide() {
     );
     position += 1;
   }
+}
 
-  console.log('  → Tables remplies.');
+async function remplirLieux() {
+  console.log(`  → Remplissage des lieux (${lieux.length})…`);
+  // « ordre » garde l'ordre du fichier : sans lui, les sous-catégories
+  // ressortiraient par ordre alphabétique (Îles avant Plages…).
+  let position = 0;
+  for (const l of lieux) {
+    await pool.query(
+      `INSERT INTO lieux
+       (id, nom, categorie, sousCategorie, ville, telephone, siteWeb, carte, aVerifier, ordre)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [
+        l.id, l.nom, l.categorie, l.sousCategorie, l.ville,
+        l.telephone || null, l.siteWeb || null, l.carte || null,
+        l.aVerifier === true, position,
+      ]
+    );
+    position += 1;
+  }
 }
 
 /* -------------------------------------------------------------------
@@ -176,4 +225,8 @@ export function activiteDepuisBase(ligne) {
     ...ligne,
     sousCategories: JSON.parse(ligne.sousCategories || '[]'),
   };
+}
+
+export function lieuDepuisBase(ligne) {
+  return { ...ligne, aVerifier: Boolean(ligne.aVerifier) };
 }

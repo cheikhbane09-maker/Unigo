@@ -81,7 +81,7 @@ export default function Accueil() {
               </div>
               <div className="rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15">
                 <p className="text-2xl font-extrabold text-white">{stats?.activites ?? '—'}</p>
-                <p className="mt-0.5 text-xs text-white/70">Catégories de loisirs</p>
+                <p className="mt-0.5 text-xs text-white/70">Lieux de sortie</p>
               </div>
             </div>
           </div>
