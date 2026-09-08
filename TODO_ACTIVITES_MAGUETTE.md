@@ -35,112 +35,54 @@ sinon tu ne verras que la page d'accueil. Ta page est http://localhost:5173/acti
 
 ---
 
-## 1. Ce qui est déjà fait pour toi
+## 1. Ce qui est déjà fait
 
 | Élément | Emplacement | État |
 |---|---|---|
-| Table `activites` | `server/src/base.js` | ✅ créée automatiquement |
-| Les 4 familles + sous-catégories | `server/src/donnees.js` → `categoriesActivites` | ✅ ta liste est déjà saisie |
-| API | `server/src/routes/contenu.routes.js` → `GET /api/activites` | ✅ fonctionne |
-| Page web | `client/src/pages/Activites.jsx` | ✅ onglets par famille |
-| Ton fichier de travail | `server/src/donnees-activites.js` | ✅ 3 lieux d'exemple |
+| Table `activites` | `server/src/base.js` | ✅ les 4 familles |
+| Table `lieux` | `server/src/base.js` | ✅ **68 lieux** |
+| Le contenu que tu as rassemblé | `server/src/donnees-activites.js` | ✅ nom, téléphone, site, carte |
+| API | `contenu.routes.js` → `GET /api/lieux` | ✅ filtre `?categorie=` et `?recherche=` |
+| Page web | `client/src/pages/Activites.jsx` | ✅ fiches par sous-catégorie |
+
+Sur http://localhost:5173/activites : 4 onglets, une barre de recherche, et pour
+chaque lieu une fiche avec le **nom cliquable** (site officiel, sinon Google Maps),
+le **téléphone cliquable** (`tel:`) et un badge **⚠** quand le numéro reste à confirmer.
+
+Répartition actuelle : 18 restaurants · 10 plages & nature · 20 loisirs · 20 culture.
 
 ## 2. Ce qu'il te reste à faire
 
-### a) Contenu (commence par ça)
+### a) Compléter les contacts (le plus utile)
 
-Aujourd'hui la page affiche des **noms de lieux dans du texte**.
-L'objectif : de **vraies fiches** avec adresse, téléphone et prix.
+**9 lieux** portent encore le badge ⚠ — la liste est dans `CONTACTS_ACTIVITES.md`.
+Un coup de fil ou une recherche, et tu remplaces `telephone: ''` par le numéro
+dans `server/src/donnees-activites.js`, puis tu passes `aVerifier` à `false`.
 
-Ouvre **`server/src/donnees-activites.js`** et ajoute tes lieux un par un
-(en copiant un bloc existant) : restaurants, plages, parcs, salles de sport,
-cinémas, lieux culturels.
+### b) Enrichir les fiches
 
-> Après avoir modifié un fichier de données : supprime la base `unigo` dans
-> phpMyAdmin (http://localhost/phpmyadmin → onglet **Opérations** → *Supprimer la base*)
-> et relance `npm run dev`. Elle est recréée avec ton nouveau contenu.
+Dans `server/src/donnees-activites.js`, ajoute à chaque lieu ce qui manque :
+adresse précise, quartier, fourchette de prix, horaires, une phrase de description.
 
-### b) Brancher tes lieux à la base et à l'API
+Pour qu'un nouveau champ s'affiche, il faut le déclarer à trois endroits — c'est
+toujours la même mécanique, prends `ville` comme modèle :
 
-Ton fichier `donnees-activites.js` n'est encore relié à rien. 4 étapes, dans l'ordre :
+1. le champ dans `server/src/donnees-activites.js`
+2. la colonne dans `CREATE TABLE lieux` + le `INSERT` de `remplirLieux()` (`server/src/base.js`)
+3. l'affichage dans la fiche de `client/src/pages/Activites.jsx`
 
-**1.** Dans `server/src/base.js`, ajoute la table (à côté des autres `CREATE TABLE`) :
+> ⚠ Après **toute** modification d'un fichier de données : supprime la base `unigo`
+> dans phpMyAdmin (http://localhost/phpmyadmin → onglet **Opérations** →
+> *Supprimer la base*) et relance `npm run dev`. Sinon tu ne verras aucun changement :
+> le remplissage ne se fait que sur une table vide.
 
-```js
-await pool.query(`
-  CREATE TABLE IF NOT EXISTS lieux (
-    id          VARCHAR(60) PRIMARY KEY,
-    nom         VARCHAR(120) NOT NULL,
-    categorie   VARCHAR(60),
-    quartier    VARCHAR(120),
-    adresse     VARCHAR(255),
-    telephone   VARCHAR(40),
-    siteWeb     VARCHAR(255),
-    prixMin     INT,
-    prixMax     INT,
-    description TEXT
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-`);
-```
+### c) Pour aller plus loin
 
-**2.** Toujours dans `base.js`, en haut : `import { lieux } from './donnees-activites.js';`
-puis dans `remplirSiVide()`, à la suite des activités :
-
-```js
-for (const l of lieux) {
-  await pool.query(
-    `INSERT INTO lieux (id, nom, categorie, quartier, adresse, telephone, siteWeb, prixMin, prixMax, description)
-     VALUES (?,?,?,?,?,?,?,?,?,?)`,
-    [l.id, l.nom, l.categorie, l.quartier, l.adresse, l.telephone, l.siteWeb,
-     l.prixMin, l.prixMax, l.description]
-  );
-}
-```
-
-**3.** Dans `server/src/routes/contenu.routes.js`, copie la route `/activites` et adapte.
-Le `?categorie=` permettra de filtrer depuis la page :
-
-```js
-router.get('/lieux', exigeConnexion, async (req, res) => {
-  try {
-    let requete = 'SELECT * FROM lieux';
-    const valeurs = [];
-    if (req.query.categorie) {
-      requete += ' WHERE categorie = ?';   // le « ? » : jamais de valeur collée dans le SQL
-      valeurs.push(req.query.categorie);
-    }
-    const [lignes] = await pool.query(requete + ' ORDER BY nom', valeurs);
-    res.json({ data: lignes });
-  } catch (erreur) {
-    console.error('Erreur lieux :', erreur);
-    res.status(500).json({ error: 'Impossible de charger les lieux.' });
-  }
-});
-```
-
-**4.** Supprime la base dans phpMyAdmin, relance `npm run dev`, et teste :
-http://localhost:4000/api/lieux (il dira « Connexion requise » — c'est normal, c'est protégé).
-
-### c) Front-end — `client/src/pages/Activites.jsx`
-
-- [ ] Afficher les lieux de la famille sélectionnée, en cartes :
-
-```jsx
-import { useApi } from '../lib/useApi.js';
-
-const { donnees: lieux, erreur, chargement } = useApi(`/lieux?categorie=${familleActive}`);
-```
-
-  (`useApi` gère tout seul l'attente, l'erreur et le jeton de connexion.)
-- [ ] Rendre le téléphone cliquable : `<a href={'tel:' + lieu.telephone}>` — voir
-      `client/src/pages/DetailUniversite.jsx`, c'est déjà fait là-bas.
-- [ ] Afficher la fourchette de prix avec `formaterFcfa()` (dans `client/src/lib/api.js`).
-- [ ] Une barre de recherche par nom de lieu.
-
-### d) Pour aller plus loin
-- [ ] Page de détail d'un lieu (`/activites/:id`) — la route s'ajoute dans `client/src/App.jsx`.
-- [ ] Agenda des événements (Dak'Art, Festa2H, Saint-Louis Jazz) avec les dates.
+- [ ] Page de détail d'un lieu (`/activites/:id`) — la route s'ajoute dans `client/src/App.jsx`,
+      copie le modèle de `DetailUniversite.jsx`.
+- [ ] Agenda des événements avec les dates (Dak'Art, Festa2H, Saint-Louis Jazz…).
 - [ ] Photos des lieux.
+- [ ] Filtre par prix, ou par quartier.
 
 ## 3. Rappel des commandes Git
 
