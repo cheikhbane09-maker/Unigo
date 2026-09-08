@@ -1,18 +1,23 @@
 /* ===================================================================
- * DONNÉES DE DÉMONSTRATION
+ * TOUT LE CONTENU DU SITE
  * -------------------------------------------------------------------
- * Tant que le backend n'est pas branché, le site lit ses informations
- * dans ce fichier. C'est du JavaScript pur : des tableaux d'objets.
+ * C'est ICI qu'on modifie les universités, les transports et les
+ * activités. C'est l'ancien client/src/data/donnees.js : il a
+ * simplement déménagé côté serveur, puisque c'est le serveur qui
+ * envoie maintenant les données au site.
  *
- * Quand l'API sera prête, on remplacera simplement
- *     import { universites } from '../data/donnees.js'
- * par un appel réseau, et le reste des pages ne bougera pas.
+ * ⚠ APRÈS AVOIR MODIFIÉ CE FICHIER, en 3 étapes :
+ *     1. enregistrer (Ctrl + S)
+ *     2. supprimer le fichier server/donnees.json
+ *     3. relancer le serveur
  *
- * Les contacts des établissements ont été vérifiés en septembre 2026
- * (voir CONTACTS_ETABLISSEMENTS.md à la racine du projet).
+ * Pourquoi ? Parce que donnees.json est la vraie base de données
+ * (elle contient aussi les comptes). Ce fichier-ci ne sert qu'à la
+ * créer la première fois. Tant que donnees.json existe, c'est lui
+ * qui fait foi et tes modifications ici sont ignorées.
  * =================================================================== */
 
-export const universites = [
+const universites = [
   {
     id: 'unipro',
     nom: 'UNIPRO',
@@ -163,13 +168,7 @@ export const universites = [
   },
 ];
 
-/* -------------------------------------------------------------------
- * MODULE TRANSPORT — Binta Comé
- * Fourchettes de tarifs relevées sur l'agglomération de Dakar.
- * Elles sont générales : elles s'appliquent à tous les campus.
- * ----------------------------------------------------------------- */
-
-export const moyensTransport = [
+const moyensTransport = [
   {
     id: 'aftu-tata',
     nom: 'AFTU / Tata',
@@ -217,12 +216,7 @@ export const moyensTransport = [
   },
 ];
 
-/* -------------------------------------------------------------------
- * MODULE ACTIVITÉS & DIVERTISSEMENT — Maguette Niang
- * Les quatre familles et leurs sous-catégories.
- * ----------------------------------------------------------------- */
-
-export const categoriesActivites = [
+const categoriesActivites = [
   {
     id: 'plages-nature',
     emoji: '🏖️',
@@ -276,8 +270,9 @@ export const categoriesActivites = [
   },
 ];
 
-/** Transforme 250000 en « 250 000 FCFA ». */
-export function formaterFcfa(montant) {
-  if (montant === null || montant === undefined) return '—';
-  return `${new Intl.NumberFormat('fr-FR').format(montant)} FCFA`;
-}
+export const donneesInitiales = {
+  utilisateurs: [], // se remplit au fur et a mesure des inscriptions
+  universites,
+  moyensTransport,
+  categoriesActivites,
+};

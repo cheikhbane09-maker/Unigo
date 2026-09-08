@@ -42,7 +42,19 @@ export default function DetailUniversite() {
             </span>
           </span>
 
-          <h1 className="mt-3 text-3xl font-extrabold text-white sm:text-4xl">{universite.nom}</h1>
+          {/* Le titre renvoie lui aussi vers le site officiel de l'etablissement. */}
+          <h1 className="mt-3 text-3xl font-extrabold text-white sm:text-4xl">
+            <a
+              href={universite.siteWeb}
+              target="_blank"
+              rel="noreferrer noopener"
+              title={`Ouvrir le site officiel de ${universite.nom}`}
+              className="hover:underline"
+            >
+              {universite.nom}
+              <span aria-hidden="true" className="ml-2 text-xl text-white/60">&#8599;</span>
+            </a>
+          </h1>
           <p className="mt-2 text-white/80">{universite.nomComplet}</p>
         </div>
       </div>

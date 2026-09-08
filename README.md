@@ -1,123 +1,67 @@
 # UNIGO — Plateforme web pour les étudiants étrangers au Sénégal
 
 Projet développé d'après le cahier des charges *« Conception et développement d'une plateforme web
-dédiée aux étudiants étrangers au Sénégal — Université · Transport · Activités & Divertissement »* (v1.0).
+dédiée aux étudiants étrangers au Sénégal — Université · Transport · Activités & Divertissement »*.
 
-**Stack :** React 18 + Vite + Tailwind CSS · Node.js + Express · Prisma + MySQL (XAMPP) · JWT + bcrypt.
+**Stack :** React 18 + Vite + Tailwind CSS · Node.js + Express · JWT + bcrypt
 
 | Membre | Module | Branche Git |
 |---|---|---|
-| Kaiju | Université (+ authentification, base commune, design) | `feature/universite-kaiju` |
+| Kaiju | Université (+ authentification, design) | `feature/universite-kaiju` |
 | Binta Comé | Transport | `feature/transport-binta` |
 | Maguette Niang | Activités & Divertissement | `feature/activites-maguette` |
 
 ---
 
-## 0. Démarrage rapide — le frontend seul (2 minutes)
+## 1. Lancer le projet (2 commandes)
 
-Le front-end fonctionne **sans backend, sans MySQL et sans XAMPP** : il lit ses données
-dans `client/src/data/donnees.js`. C'est le moyen le plus rapide de voir le site.
+**Rien à installer d'autre que Node.js.** Pas de MySQL, pas de XAMPP, pas de base de données à créer.
 
 ```bash
-cd client
 npm install
 npm run dev
 ```
 
-Le navigateur s'ouvre tout seul sur http://localhost:5173
+C'est tout. Deux serveurs démarrent en même temps :
 
-| Adresse | Page |
-|---|---|
-| `/` | Accueil (page vitrine) |
-| `/inscription` | Créer un compte |
-| `/connexion` | Se connecter |
-| `/mot-de-passe-oublie` | Demander un lien de réinitialisation |
-| `/nouveau-mot-de-passe` | Choisir un nouveau mot de passe |
-| `/universites` | Annuaire des 9 établissements |
-| `/universites/cesag` | Fiche détaillée d'un établissement |
-| `/transport` | Module de Binta |
-| `/activites` | Module de Maguette |
-
-Les formulaires valident les saisies et affichent les erreurs, mais n'envoient encore rien
-au serveur : chaque page contient un commentaire `ÉTAPE SUIVANTE` qui indique où brancher
-l'appel à l'API.
-
-## 1. Prérequis
-
-- **Node.js 18 ou plus** — https://nodejs.org (prendre la version LTS)
-- **XAMPP** (pour MySQL et phpMyAdmin) — https://www.apachefriends.org
-- **Git** — https://git-scm.com
-
-Vérifier l'installation :
-
-```bash
-node -v
-npm -v
-git --version
-```
-
-## 2. Installation (5 minutes)
-
-### a) Démarrer MySQL et créer la base
-
-1. Ouvrir le **XAMPP Control Panel**.
-2. Cliquer sur **Start** en face de **MySQL** (Apache n'est pas obligatoire, mais utile pour phpMyAdmin).
-3. Ouvrir http://localhost/phpmyadmin
-4. Onglet **Bases de données** → nom : `unigo` → interclassement `utf8mb4_general_ci` → **Créer**.
-
-### b) Installer les dépendances
-
-À la racine du projet :
-
-```bash
-npm install
-```
-
-### c) Configurer le serveur
-
-Copier le fichier d'exemple puis l'adapter si besoin :
-
-```bash
-# Windows (PowerShell)
-copy server\.env.example server\.env
-
-# macOS / Linux
-cp server/.env.example server/.env
-```
-
-Avec XAMPP par défaut (utilisateur `root`, mot de passe vide), la valeur fournie fonctionne telle quelle :
-
-```
-DATABASE_URL="mysql://root:@localhost:3306/unigo"
-```
-
-> Si votre MySQL a un mot de passe : `mysql://root:VOTRE_MOT_DE_PASSE@localhost:3306/unigo`
-
-### d) Créer les tables et charger les données
-
-```bash
-npm run db:setup
-```
-
-Cette commande enchaîne trois étapes : `prisma generate` (client), `prisma db push` (création des
-tables) et `seed` (12 universités, filières, guide des démarches, données de démarrage transport et
-activités, comptes de test).
-
-### e) Lancer le projet
-
-```bash
-npm run dev
-```
-
-- Front-end : http://localhost:5173
-- API : http://localhost:4000/api/health
-
-### Comptes de démonstration
-
-| Rôle | E-mail | Mot de passe |
+| | Adresse | Rôle |
 |---|---|---|
-| Administrateur | `admin@unigo.sn` | `Admin1234!` |
-| Étudiant | `etudiant@unigo.sn` | `Etudiant1234!` |
+| Site | http://localhost:5173 | Le site React |
+| API | http://localhost:4000 | Le serveur Express |
+
+Pour vérifier que l'API répond : http://localhost:4000/api/sante
+
+### Lancer un seul des deux
+
+```bash
+npm run dev:server   # seulement l'API (port 4000)
+npm run dev:client   # seulement le site (port 5173)
+```
+
+### Premier compte
+
+Il n'y a aucun compte au départ : va sur **/inscription** et crée le tien.
+Le site est fermé — sans compte, on ne voit que la page d'accueil.
+
+---
+
+## 2. Où sont les données
+
+Dans **`server/donnees.json`**, un simple fichier créé automatiquement au premier démarrage.
+Tu peux l'ouvrir dans VS Code pour voir ce qu'il contient.
+
+- Pour **modifier le contenu du site** (universités, transports, activités) :
+  édite **`server/src/donnees.js`**, supprime `server/donnees.json`, relance le serveur.
+- Pour **repartir de zéro** (effacer tous les comptes) : supprime `server/donnees.json`.
+
+> Attention aux deux noms qui se ressemblent :
+> `server/src/donnees.js` = le contenu que **tu écris** · `server/donnees.json` = la base **générée**.
+
+`donnees.json` n'est pas envoyé sur GitHub (il contient les comptes des utilisateurs).
+
+> Un fichier JSON suffit largement pour ce projet. Pour un vrai site avec beaucoup de
+> visiteurs, on passerait à MySQL ou PostgreSQL : seul `server/src/base.js` serait à
+> réécrire, les routes ne changeraient pas d'une ligne.
 
 ---
 
@@ -125,110 +69,80 @@ npm run dev
 
 ```
 UNIGO/
-├─ package.json              → scripts communs (npm run dev lance l'API + le front)
-├─ server/                   → API REST (Node.js / Express / Prisma)
-│  ├─ .env.example           → variables d'environnement à copier en .env
-│  ├─ prisma/
-│  │  ├─ schema.prisma       → modèle de données (toutes les tables)
-│  │  └─ seed.js             → données de départ
+├─ server/                      → l'API (Node.js + Express)
+│  ├─ donnees.json              → la base de données (créée toute seule)
 │  └─ src/
-│     ├─ index.js            → point d'entrée, sécurité, montage des routes
-│     ├─ config/env.js       → lecture de la configuration
-│     ├─ lib/                → client Prisma, envoi d'e-mails
-│     ├─ middleware/         → authentification JWT, gestion des erreurs
+│     ├─ index.js               → point d'entrée, branche les routes
+│     ├─ base.js                → lire / écrire donnees.json
+│     ├─ auth.js                → jetons JWT et protection des routes
+│     ├─ donnees.js            → LE CONTENU DU SITE (à modifier ici)
 │     └─ routes/
-│        ├─ auth.routes.js          → inscription, login, mot de passe oublié
-│        ├─ universities.routes.js  → module Université (Kaiju)
-│        ├─ reviews / favorites / procedures / testimonials
-│        ├─ transport.routes.js     → module Transport (Binta)
-│        ├─ activities.routes.js    → module Activités (Maguette)
-│        ├─ search.routes.js        → recherche globale multi-modules
-│        └─ admin.routes.js         → back-office
-└─ client/                   → front-end React
-   ├─ .env.example           → adresse de l'API (utile seulement si elle est hébergée ailleurs)
+│        ├─ auth.routes.js      → inscription, connexion, mot de passe
+│        └─ contenu.routes.js   → universités, transport, activités
+│
+└─ client/                      → le site (React)
    └─ src/
-      ├─ App.jsx             → toutes les routes de l'application
-      ├─ components/         → Navbar, Footer, cartes, carte OSM, icônes…
-      ├─ context/            → authentification, comparateur
-      ├─ i18n/               → traductions FR / EN
-      ├─ lib/api.js          → appels HTTP vers l'API
-      └─ pages/              → une page par écran
+      ├─ App.jsx                → toutes les adresses du site
+      ├─ context/AuthContext.jsx→ qui est connecté
+      ├─ lib/api.js             → tous les appels à l'API
+      ├─ lib/useApi.js          → charge des données (attente / erreur / succès)
+      ├─ components/            → Navbar, Footer, RouteProtegee…
+      └─ pages/                 → une page par écran
 ```
 
-## 4. Scripts disponibles
+---
 
-| Commande | Effet |
-|---|---|
-| `npm run dev` | Lance l'API et le front-end ensemble |
-| `npm run dev:server` | Lance uniquement l'API (port 4000) |
-| `npm run dev:client` | Lance uniquement le front-end (port 5173) |
-| `npm run db:setup` | Génère le client Prisma, crée les tables et charge les données |
-| `npm run seed` | Recharge uniquement les données de démonstration |
-| `npm run build` | Construit la version de production du front-end |
-| `npm start` | Construit le site puis le sert avec l'API sur le port 4000 (production) |
-| `npm run prisma:studio -w server` | Ouvre une interface visuelle sur la base de données |
+## 4. Les adresses de l'API
 
-## 5. Principales routes de l'API
+| Méthode | Adresse | Accès | Rôle |
+|---|---|---|---|
+| GET | `/api/sante` | public | Vérifier que l'API tourne |
+| GET | `/api/statistiques` | public | Les 3 chiffres de la page d'accueil |
+| POST | `/api/auth/inscription` | public | Créer un compte |
+| POST | `/api/auth/connexion` | public | Se connecter |
+| POST | `/api/auth/nouveau-mot-de-passe` | public | Changer son mot de passe |
+| GET | `/api/auth/moi` | 🔒 connecté | Le profil de la personne connectée |
+| GET | `/api/universites` | 🔒 connecté | L'annuaire (`?recherche=` et `?domaine=`) |
+| GET | `/api/universites/:id` | 🔒 connecté | La fiche d'un établissement |
+| GET | `/api/transport` | 🔒 connecté | Les moyens de transport |
+| GET | `/api/activites` | 🔒 connecté | Les familles d'activités |
 
-| Méthode | Route | Description |
-|---|---|---|
-| POST | `/api/auth/register` | Inscription |
-| POST | `/api/auth/login` | Connexion (JWT) |
-| POST | `/api/auth/forgot-password` | Envoi du lien de réinitialisation |
-| POST | `/api/auth/reset-password` | Nouveau mot de passe |
-| GET | `/api/auth/me` | Profil connecté |
-| GET | `/api/universities` | Annuaire + filtres + pagination |
-| GET | `/api/universities/filters` | Valeurs disponibles pour les filtres |
-| GET | `/api/universities/compare?ids=` | Comparateur |
-| GET | `/api/universities/:slug` | Fiche détaillée |
-| POST | `/api/reviews` | Déposer un avis (modéré) |
-| POST | `/api/favorites/toggle` | Ajouter / retirer un favori |
-| GET | `/api/procedures` | Guide des démarches |
-| GET | `/api/search?q=` | Recherche globale multi-modules |
-| GET | `/api/transport` | Moyens de transport *(module Binta)* |
-| GET | `/api/activities/events` | Agenda des événements *(module Maguette)* |
-| GET | `/api/admin/stats` | Statistiques du back-office |
+**Tester une adresse protégée dans le navigateur ne marchera pas** : il faut un jeton.
+C'est normal, c'est justement le but. Le site, lui, l'envoie automatiquement.
 
-## 6. Sécurité mise en place
+---
 
-Conformément à la section 5 du cahier des charges :
+## 5. La sécurité
 
-- Mots de passe **hachés avec bcrypt** (coût 12), jamais stockés en clair.
-- Sessions par **jeton JWT** signé, expiration configurable.
-- Jetons de réinitialisation **à usage unique**, valables 30 minutes, stockés hachés (SHA-256).
-- **Limitation des tentatives** de connexion (10 essais / 15 min) et des demandes de réinitialisation.
-- En-têtes de sécurité **Helmet**, **CORS** restreint au front-end, corps de requête limité à 1 Mo.
-- Vérification de toutes les données reçues côté serveur (`if` explicites dans chaque route) :
-  on ne fait jamais confiance à ce qui vient du navigateur.
-- Requêtes SQL générées par **Prisma** (requêtes paramétrées → protection contre l'injection SQL).
-- React échappe le contenu par défaut (protection XSS).
+- **Mots de passe hachés avec bcrypt.** Le mot de passe n'est jamais stocké : on garde
+  une empreinte impossible à inverser. Ouvre `server/donnees.json` pour le vérifier.
+- **Jeton JWT signé**, valable 7 jours. Le navigateur le range et le renvoie à chaque appel.
+- **Double protection des pages** : React empêche d'afficher la page sans compte
+  (`RouteProtegee.jsx`), et l'API refuse de renvoyer les données sans jeton
+  (`exigeConnexion` dans `auth.js`). La deuxième est la vraie — on peut contourner React
+  en tapant l'adresse de l'API à la main, jamais le contrôle du serveur.
+- **Message de connexion volontairement vague** (« e-mail ou mot de passe incorrect ») :
+  sinon un pirate pourrait deviner quelles adresses sont inscrites.
+- **Vérification de toutes les données reçues** côté serveur : on ne fait jamais confiance
+  à ce qui vient du navigateur.
 
-> En production : servir le site en **HTTPS**, remplacer `JWT_SECRET` par une valeur longue et
-> aléatoire, et activer les sauvegardes automatiques de la base.
+> Avant une vraie mise en ligne : servir le site en HTTPS et remplacer la clé
+> `JWT_SECRET` (dans `server/src/auth.js`) par une longue chaîne aléatoire
+> rangée dans un fichier `.env`.
 
-## 7. Comment lire le code (pour débuter)
+---
 
-Le code est volontairement écrit de façon simple et répétitive : une fois qu'on a
-compris **une** route, on les comprend toutes.
+## 6. Comment lire le code
 
-**Une route de l'API suit toujours le même plan :**
+Tout est écrit sur le même modèle. Une fois qu'on a compris une route, on les comprend toutes.
+
+**Une route de l'API :**
 
 ```js
-router.post('/mon-adresse', async (req, res) => {
+router.get('/mon-adresse', exigeConnexion, (req, res) => {
   try {
-    // 1. on récupère ce qui a été envoyé par le formulaire
-    const { titre } = req.body;
-
-    // 2. on vérifie que c'est correct
-    if (!titre) {
-      return res.status(400).json({ error: 'Le titre est obligatoire.' });
-    }
-
-    // 3. on parle à la base de données
-    const resultat = await prisma.maTable.create({ data: { titre } });
-
-    // 4. on renvoie la réponse
-    res.status(201).json({ data: resultat });
+    const donnees = lireBase().maListe;   // 1. on lit la base
+    res.json({ data: donnees });          // 2. on renvoie du JSON
   } catch (erreur) {
     console.error(erreur);
     res.status(500).json({ error: 'Message affiché à l\'utilisateur.' });
@@ -236,86 +150,44 @@ router.post('/mon-adresse', async (req, res) => {
 });
 ```
 
-**Une page React suit toujours le même plan :**
+**Une page React qui charge des données :**
 
 ```jsx
-const [donnees, setDonnees] = useState([]);        // 1. la mémoire de la page
+const { donnees, erreur, chargement } = useApi('/transport');
 
-useEffect(() => {                                   // 2. au chargement, on appelle l'API
-  get('/universities').then((r) => setDonnees(r.data));
-}, []);
+if (chargement) return <Chargement />;
+if (erreur) return <ErreurChargement message={erreur} />;
 
-return <div>{donnees.map((u) => <p key={u.id}>{u.name}</p>)}</div>;  // 3. l'affichage
+return <div>{donnees.map((x) => <p key={x.id}>{x.nom}</p>)}</div>;
 ```
 
-Les codes de réponse utilisés : **200** tout va bien · **201** créé · **400** données
-invalides · **401** pas connecté · **403** pas le droit · **404** introuvable ·
-**409** existe déjà · **500** erreur du serveur.
+Codes de réponse : **200** ok · **201** créé · **400** données invalides ·
+**401** pas connecté · **404** introuvable · **409** existe déjà · **500** erreur serveur.
 
-Fichiers à lire en premier pour comprendre l'ensemble :
-`server/src/index.js`, puis `server/src/routes/auth.routes.js`,
-puis `client/src/App.jsx` et `client/src/pages/Login.jsx`.
+**Le réflexe de débogage :** quand quelque chose ne marche pas sur le site, le vrai message
+d'erreur est dans le **terminal de l'API**, pas dans le navigateur.
 
-## 8. Travail en équipe
+---
 
-Chaque membre travaille sur sa branche puis ouvre une *pull request* vers `main`.
-La marche à suivre détaillée se trouve dans **GUIDE_UNIGO_VSCODE.docx** (à la racine du projet).
+## 7. Travail en équipe
+
+Chacun travaille sur sa branche, puis ouvre une pull request vers `main`.
+La marche à suivre complète est dans **GUIDE_UNIGO_VSCODE.docx**.
 
 ```bash
-git checkout main
-git pull origin main
-git checkout -b feature/mon-module
+git checkout feature/transport-binta
 # … modifications …
 git add .
-git commit -m "feat(transport): ajout des filtres par mode"
-git push origin feature/mon-module
+git commit -m "feat(transport): ajout des trajets fréquents"
+git push
 ```
 
-## 9. Mise en ligne (production)
+---
 
-En développement, le site (port 5173) et l'API (port 4000) sont deux serveurs séparés,
-reliés par le proxy de Vite (`client/vite.config.js`).
+## 8. Reste à faire
 
-En production, **un seul serveur suffit** : Express sert à la fois l'API et le site React.
-
-```bash
-npm start
-```
-
-Cette commande construit le site (`client/dist`) puis démarre le serveur. Tout est
-alors accessible sur **http://localhost:4000** — le site *et* l'API. Plus de proxy,
-plus de CORS, un seul port à ouvrir.
-
-Le serveur détecte tout seul la présence du dossier `client/dist` : s'il existe, il le
-sert et renvoie `index.html` pour toutes les adresses gérées par React (`/connexion`,
-`/universites/ucad`…) ; les adresses commençant par `/api` restent réservées à l'API.
-
-**Avant de déployer sur un vrai hébergeur :**
-
-| À faire | Où |
-|---|---|
-| Remplacer `JWT_SECRET` par une longue chaîne aléatoire | `server/.env` |
-| Mettre `NODE_ENV=production` | `server/.env` |
-| Renseigner les identifiants MySQL de l'hébergeur | `server/.env` → `DATABASE_URL` |
-| Activer l'envoi d'e-mails (`MAIL_ENABLED=true` + SMTP) | `server/.env` |
-| Servir le site en **HTTPS** | configuration de l'hébergeur |
-| Créer les tables sur le serveur distant | `npm run prisma:push -w server` |
-
-**Cas particulier — site et API hébergés séparément** (par exemple le site sur Netlify
-et l'API sur Render) : créez un fichier `client/.env` à partir de `client/.env.example`
-et renseignez l'adresse complète de l'API :
-
-```
-VITE_API_URL="https://mon-api.exemple.com/api"
-```
-
-Pensez alors à mettre `CLIENT_URL` dans `server/.env` à l'adresse du site, sinon CORS
-bloquera les appels.
-
-## 10. Reste à faire
-
-- **Transport (Binta)** : filtres par mode, fiches détaillées, carte interactive, annuaire des prestataires.
-- **Activités (Maguette)** : filtres agenda, détail d'un événement, formulaire de proposition, recommandations.
-- **Commun** : traduction anglaise des contenus de la base, messagerie/forum, notifications e-mail, déploiement.
-- **Contenu** : vérifier et confirmer auprès des établissements toutes les données du seed
-  (frais, effectifs, conditions d'admission), qui sont actuellement indicatives.
+- **Transport (Binta)** : trajets fréquents (aéroport ↔ campus), filtres, carte interactive
+- **Activités (Maguette)** : vrais lieux avec adresse et téléphone, agenda des événements
+- **Commun** : favoris, avis sur les établissements, guide des démarches administratives,
+  version anglaise, déploiement en ligne
+- **Contenu** : confirmer par téléphone les contacts marqués ⚠ dans `CONTACTS_ETABLISSEMENTS.md`

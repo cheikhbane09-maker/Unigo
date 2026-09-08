@@ -77,7 +77,21 @@ export default function Universites() {
             {resultats.map((u) => (
               <article key={u.id} className="carte flex flex-col">
                 <div className="flex items-start justify-between gap-3">
-                  <h2 className="text-lg font-bold text-ardoise-900">{u.nom}</h2>
+                  {/* Le nom de l'ecole est un lien direct vers son site officiel.
+                      target="_blank" ouvre dans un nouvel onglet, rel="noreferrer
+                      noopener" est la precaution de securite obligatoire avec. */}
+                  <h2 className="text-lg font-bold text-ardoise-900">
+                    <a
+                      href={u.siteWeb}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      title={`Ouvrir le site officiel de ${u.nom}`}
+                      className="hover:text-brand-700 hover:underline"
+                    >
+                      {u.nom}
+                      <span aria-hidden="true" className="ml-1 text-sm text-ardoise-400">&#8599;</span>
+                    </a>
+                  </h2>
                   <span className="puce shrink-0">{u.type}</span>
                 </div>
 
