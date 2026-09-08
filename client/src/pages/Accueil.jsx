@@ -7,7 +7,7 @@
  * =================================================================== */
 
 import { Link } from 'react-router-dom';
-import { universites, categoriesActivites } from '../data/donnees.js';
+import { useApi } from '../lib/useApi.js';
 
 /* Un petit bloc réutilisé trois fois plus bas. */
 function CarteModule({ emoji, titre, texte, lien }) {
@@ -27,6 +27,11 @@ function CarteModule({ emoji, titre, texte, lien }) {
 }
 
 export default function Accueil() {
+  // /api/statistiques est une route PUBLIQUE : elle ne renvoie que des
+  // nombres, donc la page d'accueil peut les afficher sans être connecté.
+  // Si le serveur est éteint, on affiche simplement un tiret.
+  const { donnees: stats } = useApi('/statistiques');
+
   const etapes = [
     { numero: 1, titre: 'Crée ton compte', texte: "Indique ton pays d'origine et ton projet d'études." },
     { numero: 2, titre: 'Compare et choisis', texte: 'Filtre les établissements par ville, domaine et budget.' },
@@ -67,17 +72,15 @@ export default function Accueil() {
             {/* Trois chiffres clés */}
             <div className="mt-12 grid max-w-lg grid-cols-3 gap-3">
               <div className="rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15">
-                <p className="text-2xl font-extrabold text-white">{universites.length}</p>
+                <p className="text-2xl font-extrabold text-white">{stats?.universites ?? '—'}</p>
                 <p className="mt-0.5 text-xs text-white/70">Établissements</p>
               </div>
               <div className="rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15">
-                <p className="text-2xl font-extrabold text-white">5</p>
+                <p className="text-2xl font-extrabold text-white">{stats?.transports ?? '—'}</p>
                 <p className="mt-0.5 text-xs text-white/70">Moyens de transport</p>
               </div>
               <div className="rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15">
-                <p className="text-2xl font-extrabold text-white">
-                  {categoriesActivites.reduce((total, c) => total + c.sousCategories.length, 0)}
-                </p>
+                <p className="text-2xl font-extrabold text-white">{stats?.activites ?? '—'}</p>
                 <p className="mt-0.5 text-xs text-white/70">Catégories de loisirs</p>
               </div>
             </div>

@@ -3,8 +3,7 @@
  * adresse : /activites
  * -------------------------------------------------------------------
  * Page de départ : les quatre familles d'activités et leurs
- * sous-catégories. Les données sont dans src/data/donnees.js
- * (tableau categoriesActivites).
+ * sous-catégories. Les données viennent de l'API : GET /api/activites
  *
  * À FAIRE (Maguette) :
  *  - TODO : remplir chaque sous-catégorie avec de vrais lieux
@@ -15,12 +14,30 @@
  * =================================================================== */
 
 import { useState } from 'react';
-import { categoriesActivites } from '../data/donnees.js';
+import { useApi } from '../lib/useApi.js';
 import { EnTetePage } from '../components/Layout.jsx';
+import { Chargement, ErreurChargement } from '../components/Etat.jsx';
 
 export default function Activites() {
-  // On retient la catégorie ouverte. Par défaut, la première.
-  const [categorieOuverte, setCategorieOuverte] = useState(categoriesActivites[0].id);
+  const { donnees, erreur, chargement } = useApi('/activites');
+
+  // On retient la catégorie ouverte. null = on prendra la première.
+  const [categorieOuverte, setCategorieOuverte] = useState(null);
+
+  if (chargement) return <Chargement texte="Chargement des activités…" />;
+  if (erreur) {
+    return (
+      <div className="conteneur py-10">
+        <ErreurChargement message={erreur} />
+      </div>
+    );
+  }
+
+  const categoriesActivites = donnees || [];
+  if (categoriesActivites.length === 0) return null;
+
+  // Si aucune catégorie n'a encore été cliquée, on ouvre la première.
+  const ouverte = categorieOuverte || categoriesActivites[0].id;
 
   return (
     <>
@@ -38,7 +55,7 @@ export default function Activites() {
               type="button"
               onClick={() => setCategorieOuverte(categorie.id)}
               className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                categorieOuverte === categorie.id
+                ouverte === categorie.id
                   ? 'bg-brand-700 text-white'
                   : 'bg-white text-ardoise-600 ring-1 ring-ardoise-100 hover:bg-ardoise-50'
               }`}
@@ -51,7 +68,7 @@ export default function Activites() {
         {/* Le contenu de la catégorie sélectionnée */}
         <div className="mt-8 grid gap-5 md:grid-cols-2">
           {categoriesActivites
-            .filter((categorie) => categorie.id === categorieOuverte)
+            .filter((categorie) => categorie.id === ouverte)
             .map((categorie) => (
               <div key={categorie.id} className="carte md:col-span-2">
                 <h2 className="text-xl font-bold text-ardoise-900">

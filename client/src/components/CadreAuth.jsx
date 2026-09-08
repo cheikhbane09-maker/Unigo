@@ -34,8 +34,11 @@ export default function CadreAuth({ titre, sousTitre, children, bas }) {
             </ul>
           </div>
 
+          {/* On ne promet pas une securite qu'on n'a pas encore : dans cette
+              version sans serveur, les comptes vivent dans le navigateur. */}
           <p className="text-xs text-white/60">
-            Connexion sécurisée — mot de passe chiffré, jamais stocké en clair.
+            Version de démonstration — les comptes sont enregistrés dans ce navigateur,
+            en attendant le branchement du serveur.
           </p>
         </div>
       </div>
@@ -61,6 +64,18 @@ export function Erreur({ message }) {
   return (
     <div role="alert" className="rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700">
       {message}
+    </div>
+  );
+}
+
+/* Message d'information (fond sable) : sert par exemple à expliquer
+   « tu dois te connecter pour accéder à cette page ». */
+export function Info({ message }) {
+  if (!message) return null;
+  return (
+    <div className="flex items-start gap-2.5 rounded-xl border border-sable-100 bg-sable-50 p-3 text-sm text-sable-700">
+      <span aria-hidden="true">🔒</span>
+      <span>{message}</span>
     </div>
   );
 }

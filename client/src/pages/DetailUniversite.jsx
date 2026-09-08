@@ -7,19 +7,24 @@
  * =================================================================== */
 
 import { Link, useParams } from 'react-router-dom';
-import { universites, formaterFcfa } from '../data/donnees.js';
+import { formaterFcfa } from '../lib/api.js';
+import { useApi } from '../lib/useApi.js';
+import { Chargement, ErreurChargement } from '../components/Etat.jsx';
 
 export default function DetailUniversite() {
   const { identifiant } = useParams();
 
-  // find() cherche le premier établissement dont l'id correspond.
-  const universite = universites.find((u) => u.id === identifiant);
+  // On demande directement la fiche au serveur : /api/universites/cesag
+  const { donnees: universite, erreur, chargement } = useApi(`/universites/${identifiant}`);
+
+  if (chargement) return <Chargement texte="Chargement de la fiche…" />;
 
   // Toujours prévoir le cas « pas trouvé » : sinon la page plante.
-  if (!universite) {
+  if (erreur || !universite) {
     return (
       <div className="conteneur py-20 text-center">
         <h1 className="text-2xl font-extrabold text-ardoise-900">Établissement introuvable</h1>
+        <p className="mt-2 text-ardoise-600">{erreur}</p>
         <Link to="/universites" className="bouton-principal mt-6">
           Retour à l'annuaire
         </Link>

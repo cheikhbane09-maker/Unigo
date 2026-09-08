@@ -1,41 +1,39 @@
 /* ===================================================================
  * PAGE « MOT DE PASSE OUBLIÉ »    adresse : /mot-de-passe-oublie
  * -------------------------------------------------------------------
- * Étape 1 sur 2 : l'utilisateur donne son e-mail, le serveur lui
- * enverra un lien. Étape 2 = la page NouveauMotDePasse.jsx.
+ * Étape 1 sur 2 : on saisit son adresse e-mail.
+ *
+ * Sur un vrai site, le serveur enverrait ici un e-mail contenant un
+ * lien secret. Tant qu'il n'y a pas de serveur, on passe directement
+ * à l'étape 2 en emportant l'adresse dans l'URL.
  * =================================================================== */
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import CadreAuth, { Erreur, Succes } from '../components/CadreAuth.jsx';
+import { Link, useNavigate } from 'react-router-dom';
+import CadreAuth, { Erreur } from '../components/CadreAuth.jsx';
 
 export default function MotDePasseOublie() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [erreur, setErreur] = useState(null);
-  const [succes, setSucces] = useState(null);
 
   function envoyer(event) {
     event.preventDefault();
     setErreur(null);
-    setSucces(null);
 
     if (!email.includes('@')) {
       setErreur("L'adresse e-mail n'est pas valide.");
       return;
     }
 
-    // ÉTAPE SUIVANTE : appeler POST /api/auth/forgot-password
-    // Le serveur répond toujours la même chose, que le compte existe ou non :
-    // c'est volontaire, pour ne pas révéler qui est inscrit sur le site.
-    setSucces(
-      "Si un compte est associé à cette adresse, un e-mail de réinitialisation vient d'être envoyé."
-    );
+    // encodeURIComponent protège les caractères spéciaux (@, +, espaces…)
+    navigate(`/nouveau-mot-de-passe?email=${encodeURIComponent(email.trim())}`);
   }
 
   return (
     <CadreAuth
       titre="Mot de passe oublié"
-      sousTitre="Saisis ton adresse e-mail : tu recevras un lien valable 30 minutes."
+      sousTitre="Saisis l'adresse e-mail de ton compte pour choisir un nouveau mot de passe."
       bas={
         <Link to="/connexion" className="font-semibold text-brand-700 hover:underline">
           ← Retour à la connexion
@@ -44,7 +42,6 @@ export default function MotDePasseOublie() {
     >
       <form onSubmit={envoyer} className="space-y-4" noValidate>
         <Erreur message={erreur} />
-        <Succes message={succes} />
 
         <div>
           <label className="etiquette" htmlFor="email">Adresse e-mail</label>
@@ -59,15 +56,13 @@ export default function MotDePasseOublie() {
         </div>
 
         <button type="submit" className="bouton-principal w-full">
-          Envoyer le lien
+          Continuer
         </button>
       </form>
 
       <p className="mt-6 rounded-xl bg-ardoise-100 p-3 text-xs text-ardoise-600">
-        Pour voir la page suivante sans e-mail, va directement sur{' '}
-        <Link to="/nouveau-mot-de-passe" className="font-semibold text-brand-700 hover:underline">
-          /nouveau-mot-de-passe
-        </Link>.
+        Quand le serveur sera branché, cette page enverra un vrai e-mail avec un lien
+        valable 30 minutes, au lieu de passer directement à l'étape suivante.
       </p>
     </CadreAuth>
   );

@@ -3,13 +3,19 @@
  * -------------------------------------------------------------------
  * Ici il y a plusieurs champs. Au lieu d'un useState par champ, on en
  * utilise UN SEUL qui contient un objet avec tous les champs.
+ *
+ * Le compte est enregistré par useAuth() (src/context/AuthContext.jsx).
  * =================================================================== */
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import CadreAuth, { Erreur, Succes } from '../components/CadreAuth.jsx';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
+import CadreAuth, { Erreur } from '../components/CadreAuth.jsx';
 
 export default function Inscription() {
+  const { inscrire } = useAuth();
+  const navigate = useNavigate();
+
   const [champs, setChamps] = useState({
     nomComplet: '',
     email: '',
@@ -20,7 +26,7 @@ export default function Inscription() {
   });
 
   const [erreur, setErreur] = useState(null);
-  const [succes, setSucces] = useState(null);
+  const [enCours, setEnCours] = useState(false);
 
   // Met à jour un seul champ sans effacer les autres.
   // Le « ...ancien » recopie tout l'objet, puis on remplace une seule clé.
@@ -31,10 +37,9 @@ export default function Inscription() {
     };
   }
 
-  function envoyer(event) {
+  async function envoyer(event) {
     event.preventDefault();
     setErreur(null);
-    setSucces(null);
 
     if (champs.nomComplet.trim().length < 2) {
       setErreur('Le nom complet est obligatoire.');
@@ -57,8 +62,24 @@ export default function Inscription() {
       return;
     }
 
-    // ÉTAPE SUIVANTE : appeler POST /api/auth/register avec ces champs.
-    setSucces(`Formulaire valide. Bienvenue ${champs.nomComplet} !`);
+    setEnCours(true);
+    try {
+      // On n'envoie pas le champ « confirmation », il ne sert qu'ici.
+      await inscrire({
+        nomComplet: champs.nomComplet.trim(),
+        email: champs.email,
+        motDePasse: champs.motDePasse,
+        pays: champs.pays,
+        domaine: champs.domaine,
+      });
+
+      // Inscription réussie : la personne est déjà connectée, on entre dans le site.
+      navigate('/universites', { replace: true });
+    } catch (e) {
+      setErreur(e.message); // message renvoyé par l'API
+    } finally {
+      setEnCours(false);
+    }
   }
 
   return (
@@ -76,7 +97,6 @@ export default function Inscription() {
     >
       <form onSubmit={envoyer} className="space-y-4" noValidate>
         <Erreur message={erreur} />
-        <Succes message={succes} />
 
         <div>
           <label className="etiquette" htmlFor="nom">Nom complet</label>
@@ -113,8 +133,8 @@ export default function Inscription() {
           </div>
         </div>
 
-        <button type="submit" className="bouton-principal w-full">
-          Créer mon compte
+        <button type="submit" className="bouton-principal w-full" disabled={enCours}>
+          {enCours ? 'Création…' : 'Créer mon compte'}
         </button>
       </form>
     </CadreAuth>

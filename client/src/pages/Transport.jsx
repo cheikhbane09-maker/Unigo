@@ -2,7 +2,7 @@
  * MODULE TRANSPORT — Binta Comé      adresse : /transport
  * -------------------------------------------------------------------
  * Page de départ : les moyens de transport de Dakar et leurs tarifs.
- * Les données sont dans src/data/donnees.js (tableau moyensTransport).
+ * Les données viennent de l'API : GET /api/transport
  *
  * À FAIRE (Binta) :
  *  - TODO : ajouter les trajets fréquents (aéroport ↔ campus, etc.)
@@ -11,10 +11,25 @@
  *  - TODO : annuaire des prestataires (Yango, Heetch, compagnies)
  * =================================================================== */
 
-import { moyensTransport, formaterFcfa } from '../data/donnees.js';
+import { formaterFcfa } from '../lib/api.js';
+import { useApi } from '../lib/useApi.js';
 import { EnTetePage } from '../components/Layout.jsx';
+import { Chargement, ErreurChargement } from '../components/Etat.jsx';
 
 export default function Transport() {
+  const { donnees, erreur, chargement } = useApi('/transport');
+
+  if (chargement) return <Chargement texte="Chargement des transports…" />;
+  if (erreur) {
+    return (
+      <div className="conteneur py-10">
+        <ErreurChargement message={erreur} />
+      </div>
+    );
+  }
+
+  const moyensTransport = donnees || [];
+
   return (
     <>
       <EnTetePage

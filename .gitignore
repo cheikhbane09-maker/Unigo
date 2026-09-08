@@ -16,3 +16,6 @@ coverage/
 UNIGO.zip
 _to_delete/
 _tmp_extract/
+
+# La base de donnees locale (contient les comptes)
+server/donnees.json

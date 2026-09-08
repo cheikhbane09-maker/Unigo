@@ -2,17 +2,33 @@
  * MODULE UNIVERSITÉ — Kaiju        adresse : /universites
  * -------------------------------------------------------------------
  * L'annuaire des établissements, avec une recherche et un filtre.
- * Les données viennent pour l'instant de src/data/donnees.js.
+ * Les données viennent de l'API : GET /api/universites
  * =================================================================== */
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { universites, formaterFcfa } from '../data/donnees.js';
+import { formaterFcfa } from '../lib/api.js';
+import { useApi } from '../lib/useApi.js';
 import { EnTetePage } from '../components/Layout.jsx';
+import { Chargement, ErreurChargement } from '../components/Etat.jsx';
 
 export default function Universites() {
   const [recherche, setRecherche] = useState('');
   const [domaineChoisi, setDomaineChoisi] = useState('');
+
+  // Les données viennent maintenant du serveur, plus d'un fichier local.
+  const { donnees, erreur, chargement } = useApi('/universites');
+
+  if (chargement) return <Chargement texte="Chargement des établissements…" />;
+  if (erreur) {
+    return (
+      <div className="conteneur py-10">
+        <ErreurChargement message={erreur} />
+      </div>
+    );
+  }
+
+  const universites = donnees || [];
 
   // On construit la liste des domaines à partir des données,
   // sans doublon (grâce à Set) et rangée par ordre alphabétique.

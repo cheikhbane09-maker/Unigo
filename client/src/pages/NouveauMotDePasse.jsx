@@ -1,30 +1,40 @@
 /* ===================================================================
  * PAGE « NOUVEAU MOT DE PASSE »   adresse : /nouveau-mot-de-passe
  * -------------------------------------------------------------------
- * Étape 2 sur 2. L'utilisateur arrive ici en cliquant sur le lien
- * reçu par e-mail. Ce lien contient une clé secrète :
+ * Étape 2 sur 2. Sur un vrai site, on arrive ici en cliquant sur le
+ * lien reçu par e-mail, qui contient une clé secrète :
  *   /nouveau-mot-de-passe?cle=a1b2c3...
- * useSearchParams sert à lire ce qui suit le « ? » dans l'adresse.
+ *
+ * Tant qu'il n'y a pas de serveur d'e-mails, on passe simplement
+ * l'adresse dans l'adresse de la page. useSearchParams sert à lire
+ * ce qui suit le « ? ».
  * =================================================================== */
 
 import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
 import CadreAuth, { Erreur, Succes } from '../components/CadreAuth.jsx';
 
 export default function NouveauMotDePasse() {
+  const { changerMotDePasse } = useAuth();
+  const navigate = useNavigate();
   const [parametres] = useSearchParams();
-  const cle = parametres.get('cle'); // null si absente
 
+  // L'adresse arrive depuis la page précédente ; sinon on la demande.
+  const [email, setEmail] = useState(parametres.get('email') || '');
   const [motDePasse, setMotDePasse] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [erreur, setErreur] = useState(null);
   const [succes, setSucces] = useState(null);
 
-  function envoyer(event) {
+  async function envoyer(event) {
     event.preventDefault();
     setErreur(null);
-    setSucces(null);
 
+    if (!email.includes('@')) {
+      setErreur("L'adresse e-mail n'est pas valide.");
+      return;
+    }
     if (motDePasse.length < 8) {
       setErreur('Le mot de passe doit contenir au moins 8 caractères.');
       return;
@@ -38,10 +48,13 @@ export default function NouveauMotDePasse() {
       return;
     }
 
-    // ÉTAPE SUIVANTE : appeler POST /api/auth/reset-password
-    // en envoyant { cle, motDePasse }. Le serveur vérifiera que la clé
-    // existe, qu'elle n'a pas déjà servi et qu'elle n'est pas expirée.
-    setSucces('Mot de passe modifié. Tu peux maintenant te connecter.');
+    try {
+      const reponse = await changerMotDePasse(email, motDePasse);
+      setSucces(reponse.message);
+      setTimeout(() => navigate('/connexion'), 1800);
+    } catch (e) {
+      setErreur(e.message); // message renvoyé par l'API
+    }
   }
 
   return (
@@ -58,12 +71,17 @@ export default function NouveauMotDePasse() {
         <Erreur message={erreur} />
         <Succes message={succes} />
 
-        {!cle && (
-          <p className="rounded-xl bg-sable-50 p-3 text-xs text-sable-700">
-            Aucune clé de réinitialisation dans l'adresse. En vrai, l'utilisateur arrive ici
-            depuis le lien reçu par e-mail. Le formulaire reste utilisable pour la démonstration.
-          </p>
-        )}
+        <div>
+          <label className="etiquette" htmlFor="email">Adresse e-mail du compte</label>
+          <input
+            id="email"
+            type="email"
+            className="champ"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+          />
+        </div>
 
         <div>
           <label className="etiquette" htmlFor="mdp">Nouveau mot de passe</label>

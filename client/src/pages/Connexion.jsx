@@ -5,44 +5,54 @@
  *   1. useState retient ce que l'utilisateur tape
  *   2. chaque <input> affiche cette valeur (value) et la met à jour (onChange)
  *   3. onSubmit récupère le tout au moment de valider
+ *
+ * La connexion elle-même est gérée par useAuth() (src/context/AuthContext.jsx).
  * =================================================================== */
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import CadreAuth, { Erreur, Succes } from '../components/CadreAuth.jsx';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
+import CadreAuth, { Erreur, Info } from '../components/CadreAuth.jsx';
 
 export default function Connexion() {
-  // La mémoire de la page
+  const { connecter } = useAuth();
+  const navigate = useNavigate();
+  const emplacement = useLocation();
+
   const [email, setEmail] = useState('');
   const [motDePasse, setMotDePasse] = useState('');
   const [erreur, setErreur] = useState(null);
-  const [succes, setSucces] = useState(null);
+  const [enCours, setEnCours] = useState(false);
 
-  function envoyer(event) {
+  // async / await : connecter() parle au serveur, ça prend un instant.
+  async function envoyer(event) {
     event.preventDefault(); // empêche le rechargement de la page
     setErreur(null);
-    setSucces(null);
 
-    // Vérifications simples côté navigateur
     if (!email.includes('@')) {
       setErreur("L'adresse e-mail n'est pas valide.");
       return;
     }
-    if (motDePasse.length < 8) {
-      setErreur('Le mot de passe doit contenir au moins 8 caractères.');
-      return;
-    }
 
-    // ÉTAPE SUIVANTE (quand le backend sera prêt) :
-    // remplacer les deux lignes ci-dessous par un appel à l'API :
-    //   const reponse = await post('/auth/login', { email, motDePasse });
-    setSucces(`Formulaire valide. Connexion de ${email} dès que l'API sera branchée.`);
+    setEnCours(true);
+    try {
+      await connecter(email, motDePasse);
+
+      // Si la personne voulait aller sur une page protégée, on l'y renvoie.
+      // Sinon, direction l'annuaire des universités.
+      const destination = emplacement.state?.depuis || '/universites';
+      navigate(destination, { replace: true });
+    } catch (e) {
+      setErreur(e.message); // message renvoyé par l'API
+    } finally {
+      setEnCours(false);
+    }
   }
 
   return (
     <CadreAuth
       titre="Connexion"
-      sousTitre="Accède à ton profil, tes favoris et tes avis."
+      sousTitre="Connecte-toi pour accéder aux universités, aux transports et aux activités."
       bas={
         <>
           Pas encore de compte ?{' '}
@@ -53,8 +63,10 @@ export default function Connexion() {
       }
     >
       <form onSubmit={envoyer} className="space-y-4" noValidate>
+        {/* Message envoye par RouteProtegee quand on a cliqué sur un onglet
+            reserve aux membres : il explique pourquoi on est ici. */}
+        <Info message={emplacement.state?.message} />
         <Erreur message={erreur} />
-        <Succes message={succes} />
 
         <div>
           <label className="etiquette" htmlFor="email">Adresse e-mail</label>
@@ -89,10 +101,24 @@ export default function Connexion() {
           />
         </div>
 
-        <button type="submit" className="bouton-principal w-full">
-          Se connecter
+        <button type="submit" className="bouton-principal w-full" disabled={enCours}>
+          {enCours ? 'Connexion…' : 'Se connecter'}
         </button>
       </form>
+
+      {/* Bouton pratique pendant le développement : remplit le compte de démo. */}
+      <button
+        type="button"
+        onClick={() => {
+          setEmail('etudiant@unigo.sn');
+          setMotDePasse('Etudiant1234!');
+        }}
+        className="mt-6 w-full rounded-xl bg-ardoise-100 p-3 text-xs text-ardoise-600 hover:bg-ardoise-50"
+      >
+        Compte de démonstration : <strong>etudiant@unigo.sn</strong> / <strong>Etudiant1234!</strong>
+        <br />
+        <span className="text-brand-700">Cliquer ici pour remplir automatiquement</span>
+      </button>
     </CadreAuth>
   );
 }
