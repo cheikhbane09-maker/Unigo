@@ -58,6 +58,7 @@ try {
   const [[u]] = await pool.query('SELECT COUNT(*) AS n FROM universites');
   const [[t]] = await pool.query('SELECT COUNT(*) AS n FROM transports');
   const [[a]] = await pool.query('SELECT COUNT(*) AS n FROM activites');
+  const [[l]] = await pool.query('SELECT COUNT(*) AS n FROM lieux');
   const [[c]] = await pool.query('SELECT COUNT(*) AS n FROM utilisateurs');
 
   app.listen(PORT, () => {
@@ -66,6 +67,7 @@ try {
     console.log('  ════════════════════════════════════════');
     console.log(`   Base MySQL « ${nomBase} » connectée`);
     console.log(`   ${u.n} établissements · ${t.n} transports · ${a.n} familles d'activités`);
+    console.log(`   ${l.n} lieux de sortie`);
     console.log(`   ${c.n} compte(s) inscrit(s)`);
     console.log('\n   Test  : http://localhost:4000/api/sante');
     console.log('   Base  : http://localhost/phpmyadmin');

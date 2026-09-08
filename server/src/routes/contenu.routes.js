@@ -17,7 +17,7 @@
  * =================================================================== */
 
 import { Router } from 'express';
-import { pool, universiteDepuisBase, activiteDepuisBase } from '../base.js';
+import { pool, universiteDepuisBase, activiteDepuisBase, lieuDepuisBase } from '../base.js';
 import { exigeConnexion } from '../auth.js';
 
 const router = Router();
@@ -31,15 +31,11 @@ router.get('/statistiques', async (_req, res) => {
   try {
     const [[universites]] = await pool.query('SELECT COUNT(*) AS n FROM universites');
     const [[transports]] = await pool.query('SELECT COUNT(*) AS n FROM transports');
-    const [lignes] = await pool.query('SELECT sousCategories FROM activites');
+    const [[lieux]] = await pool.query('SELECT COUNT(*) AS n FROM lieux');
 
-    // On additionne le nombre de sous-catégories de chaque famille.
-    const activites = lignes.reduce(
-      (total, l) => total + JSON.parse(l.sousCategories || '[]').length,
-      0
-    );
-
-    res.json({ data: { universites: universites.n, transports: transports.n, activites } });
+    res.json({
+      data: { universites: universites.n, transports: transports.n, activites: lieux.n },
+    });
   } catch (erreur) {
     console.error('Erreur statistiques :', erreur);
     res.status(500).json({ error: 'Impossible de charger les statistiques.' });
@@ -113,6 +109,38 @@ router.get('/activites', exigeConnexion, async (_req, res) => {
   } catch (erreur) {
     console.error('Erreur activites :', erreur);
     res.status(500).json({ error: 'Impossible de charger les activités.' });
+  }
+});
+
+/* GET /api/lieux — les vrais lieux du module de Maguette
+   ?categorie=restauration  → seulement cette famille
+   ?recherche=loutcha       → cherche dans le nom */
+router.get('/lieux', exigeConnexion, async (req, res) => {
+  try {
+    let requete = 'SELECT * FROM lieux';
+    const conditions = [];
+    const valeurs = [];
+
+    if (req.query.categorie) {
+      conditions.push('categorie = ?'); // le « ? » : jamais de valeur collée dans le SQL
+      valeurs.push(req.query.categorie);
+    }
+
+    const recherche = String(req.query.recherche || '').trim();
+    if (recherche) {
+      conditions.push('(nom LIKE ? OR sousCategorie LIKE ? OR ville LIKE ?)');
+      const motif = `%${recherche}%`;
+      valeurs.push(motif, motif, motif);
+    }
+
+    if (conditions.length > 0) requete += ' WHERE ' + conditions.join(' AND ');
+    requete += ' ORDER BY ordre'; // l'ordre voulu dans donnees-activites.js
+
+    const [lignes] = await pool.query(requete, valeurs);
+    res.json({ data: lignes.map(lieuDepuisBase) });
+  } catch (erreur) {
+    console.error('Erreur lieux :', erreur);
+    res.status(500).json({ error: 'Impossible de charger les lieux.' });
   }
 });
 
