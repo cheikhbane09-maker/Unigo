@@ -16,3 +16,6 @@ UNIGO.zip
 _to_delete/
 _tmp_extract/
 
+
+# Fichiers deposes par l app Claude
+Claude outputs/
