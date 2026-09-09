@@ -34,11 +34,11 @@ export default function CadreAuth({ titre, sousTitre, children, bas }) {
             </ul>
           </div>
 
-          {/* On ne promet pas une securite qu'on n'a pas encore : dans cette
-              version sans serveur, les comptes vivent dans le navigateur. */}
+          {/* Ce qui est affiché ici doit rester vrai : les comptes sont
+              maintenant enregistrés en base MySQL, mot de passe haché. */}
           <p className="text-xs text-white/60">
-            Version de démonstration — les comptes sont enregistrés dans ce navigateur,
-            en attendant le branchement du serveur.
+            Ton compte est enregistré sur le serveur. Le mot de passe n'est jamais
+            stocké tel quel : seule son empreinte chiffrée (bcrypt) est conservée.
           </p>
         </div>
       </div>
