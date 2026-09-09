@@ -106,19 +106,11 @@ export default function Connexion() {
         </button>
       </form>
 
-      {/* Bouton pratique pendant le développement : remplit le compte de démo. */}
-      <button
-        type="button"
-        onClick={() => {
-          setEmail('etudiant@unigo.sn');
-          setMotDePasse('Etudiant1234!');
-        }}
-        className="mt-6 w-full rounded-xl bg-ardoise-100 p-3 text-xs text-ardoise-600 hover:bg-ardoise-50"
-      >
-        Compte de démonstration : <strong>etudiant@unigo.sn</strong> / <strong>Etudiant1234!</strong>
-        <br />
-        <span className="text-brand-700">Cliquer ici pour remplir automatiquement</span>
-      </button>
+      {/* Il n'y a pas de compte de démonstration : les comptes sont créés
+          par les utilisateurs et enregistrés dans la base MySQL. */}
+      <p className="mt-6 rounded-xl bg-ardoise-100 p-3 text-center text-xs text-ardoise-600">
+        Première visite ? Crée ton compte, c'est gratuit et ça prend une minute.
+      </p>
     </CadreAuth>
   );
 }
